@@ -263,9 +263,10 @@ class _StudioPageState extends State<StudioPage> {
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const TextField(
-              style: TextStyle(color: Colors.white),
-              decoration: InputDecoration(
+            TextField(
+              obscureText: true,
+              style: const TextStyle(color: Colors.white),
+              decoration: const InputDecoration(
                 labelText: 'API KEY',
                 labelStyle: TextStyle(color: Colors.white54),
                 enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: Colors.white10)),
@@ -273,8 +274,8 @@ class _StudioPageState extends State<StudioPage> {
               ),
             ),
             const SizedBox(height: 16),
-            const TextField(
-              style: TextStyle(color: Colors.white),
+            TextField(
+              style: const TextStyle(color: Colors.white),
               decoration: InputDecoration(
                 labelText: 'CUSTOM BASE URL (Optional)',
                 labelStyle: TextStyle(color: Colors.white54),
