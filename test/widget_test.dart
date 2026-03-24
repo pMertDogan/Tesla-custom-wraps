@@ -1,30 +1,47 @@
-// This is a basic Flutter widget test.
-//
-// To perform an interaction with a widget in your test, use the WidgetTester
-// utility in the flutter_test package. For example, you can send tap and scroll
-// gestures. You can also use WidgetTester to find child widgets in the widget
-// tree, read text, and verify that the values of widget properties are correct.
-
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-
 import 'package:app/main.dart';
+import 'package:app/screens/studio_page.dart';
+import 'package:app/services/vehicle_service.dart';
 
 void main() {
-  testWidgets('Counter increments smoke test', (WidgetTester tester) async {
+  testWidgets('App smoke test', (WidgetTester tester) async {
     // Build our app and trigger a frame.
-    await tester.pumpWidget(const MyApp());
+    // Wrap in a large enough Container to avoid overflow in some test environments.
+    await tester.pumpWidget(const SizedBox(
+      width: 2000,
+      height: 2000,
+      child: MyApp(),
+    ));
 
-    // Verify that our counter starts at 0.
-    expect(find.text('0'), findsOneWidget);
-    expect(find.text('1'), findsNothing);
+    // Verify that the title is present.
+    expect(find.text('TESLA WRAP STUDIO'), findsOneWidget);
+  });
 
-    // Tap the '+' icon and trigger a frame.
-    await tester.tap(find.byIcon(Icons.add));
-    await tester.pump();
+  testWidgets('StudioPage settings dialog has obscured API key field', (WidgetTester tester) async {
+    final vehicle = VehicleService.getVehicles().first;
 
-    // Verify that our counter has incremented.
-    expect(find.text('0'), findsNothing);
-    expect(find.text('1'), findsOneWidget);
+    await tester.pumpWidget(MaterialApp(
+      home: StudioPage(vehicle: vehicle),
+    ));
+
+    // Find and tap the settings button.
+    await tester.tap(find.byIcon(Icons.settings));
+    await tester.pumpAndSettle();
+
+    // Verify the dialog is shown.
+    expect(find.text('API SETTINGS'), findsOneWidget);
+
+    // Find the API KEY TextField.
+    final apiKeyTextField = find.ancestor(
+      of: find.text('API KEY'),
+      matching: find.byType(TextField),
+    );
+
+    expect(apiKeyTextField, findsOneWidget);
+
+    // Verify it has obscureText set to true.
+    final TextField textFieldWidget = tester.widget(apiKeyTextField);
+    expect(textFieldWidget.obscureText, isTrue);
   });
 }
