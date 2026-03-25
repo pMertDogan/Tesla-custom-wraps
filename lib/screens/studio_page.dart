@@ -110,6 +110,7 @@ class _StudioPageState extends State<StudioPage> {
           TextField(
             controller: _promptController,
             maxLines: 4,
+            maxLength: 2000,
             style: const TextStyle(color: Colors.white),
             decoration: InputDecoration(
               hintText: 'Describe your wrap design...',
@@ -265,6 +266,8 @@ class _StudioPageState extends State<StudioPage> {
           children: [
             TextField(
               obscureText: true,
+              autocorrect: false,
+              enableSuggestions: false,
               style: const TextStyle(color: Colors.white),
               decoration: const InputDecoration(
                 labelText: 'API KEY',
@@ -275,10 +278,12 @@ class _StudioPageState extends State<StudioPage> {
             ),
             const SizedBox(height: 16),
             TextField(
+              maxLength: 512,
               style: const TextStyle(color: Colors.white),
-              decoration: InputDecoration(
+              decoration: const InputDecoration(
                 labelText: 'CUSTOM BASE URL (Optional)',
                 labelStyle: TextStyle(color: Colors.white54),
+                helperText: 'Use HTTPS for secure communication',
                 enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: Colors.white10)),
                 focusedBorder: OutlineInputBorder(borderSide: BorderSide(color: Colors.blueAccent)),
               ),

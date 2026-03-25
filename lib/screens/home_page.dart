@@ -217,14 +217,18 @@ class HomePage extends StatelessWidget {
                           ),
                         ),
                         const SizedBox(height: 8),
-                        Text(
-                          vehicle.description,
-                          style: const TextStyle(
-                            color: Colors.white54,
-                            fontSize: 16,
+                        Expanded(
+                          child: Text(
+                            vehicle.description,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: Colors.white54,
+                              fontSize: 16,
+                            ),
                           ),
                         ),
-                        const Spacer(),
+                        const SizedBox(height: 8),
                         ElevatedButton(
                           onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (context) => StudioPage(vehicle: vehicle))),
                           style: ElevatedButton.styleFrom(
