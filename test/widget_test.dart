@@ -46,4 +46,43 @@ void main() {
     expect(textFieldWidget.autocorrect, isFalse);
     expect(textFieldWidget.enableSuggestions, isFalse);
   });
+
+  testWidgets('StudioPage TextFields have security enhancements', (WidgetTester tester) async {
+    final vehicle = VehicleService.getVehicles().first;
+
+    await tester.pumpWidget(MaterialApp(
+      home: StudioPage(vehicle: vehicle),
+    ));
+
+    // Verify Prompt TextField has maxLength
+    final promptTextFieldFinder = find.byType(TextField).first;
+    final TextField promptTextField = tester.widget(promptTextFieldFinder);
+    expect(promptTextField.maxLength, 1000);
+
+    // Open settings dialog
+    await tester.tap(find.byIcon(Icons.settings));
+    await tester.pumpAndSettle();
+
+    // Find the API KEY TextField.
+    final apiKeyTextFieldFinder = find.ancestor(
+      of: find.text('API KEY'),
+      matching: find.byType(TextField),
+    );
+    final TextField apiKeyTextField = tester.widget(apiKeyTextFieldFinder);
+
+    // Verify API Key security properties
+    expect(apiKeyTextField.autocorrect, isFalse);
+    expect(apiKeyTextField.enableSuggestions, isFalse);
+    expect(apiKeyTextField.maxLength, 512);
+
+    // Find the Custom Base URL TextField.
+    final baseUrlTextFieldFinder = find.ancestor(
+      of: find.text('CUSTOM BASE URL (Optional)'),
+      matching: find.byType(TextField),
+    );
+    final TextField baseUrlTextField = tester.widget(baseUrlTextFieldFinder);
+
+    // Verify Base URL security properties
+    expect(baseUrlTextField.maxLength, 512);
+  });
 }
