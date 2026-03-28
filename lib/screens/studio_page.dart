@@ -34,9 +34,16 @@ class _StudioPageState extends State<StudioPage> {
         backgroundColor: Colors.black,
         title: Text('STUDIO: ${widget.vehicle.name.toUpperCase()}'),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.settings),
-            onPressed: () => _showSettings(context),
+          Tooltip(
+            message: 'Settings',
+            child: Semantics(
+              label: 'Open settings',
+              button: true,
+              child: IconButton(
+                icon: const Icon(Icons.settings),
+                onPressed: () => _showSettings(context),
+              ),
+            ),
           ),
           const SizedBox(width: 10),
           ElevatedButton.icon(
@@ -185,11 +192,39 @@ class _StudioPageState extends State<StudioPage> {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  IconButton(icon: const Icon(Icons.rotate_left, color: Colors.white), onPressed: () {}),
-                  IconButton(icon: const Icon(Icons.rotate_right, color: Colors.white), onPressed: () {}),
+                  Tooltip(
+                    message: 'Rotate Left',
+                    child: Semantics(
+                      label: 'Rotate vehicle left',
+                      button: true,
+                      child: IconButton(icon: const Icon(Icons.rotate_left, color: Colors.white), onPressed: () {}),
+                    ),
+                  ),
+                  Tooltip(
+                    message: 'Rotate Right',
+                    child: Semantics(
+                      label: 'Rotate vehicle right',
+                      button: true,
+                      child: IconButton(icon: const Icon(Icons.rotate_right, color: Colors.white), onPressed: () {}),
+                    ),
+                  ),
                   const VerticalDivider(color: Colors.white10, width: 40),
-                  IconButton(icon: const Icon(Icons.zoom_in, color: Colors.white), onPressed: () {}),
-                  IconButton(icon: const Icon(Icons.zoom_out, color: Colors.white), onPressed: () {}),
+                  Tooltip(
+                    message: 'Zoom In',
+                    child: Semantics(
+                      label: 'Zoom in on vehicle',
+                      button: true,
+                      child: IconButton(icon: const Icon(Icons.zoom_in, color: Colors.white), onPressed: () {}),
+                    ),
+                  ),
+                  Tooltip(
+                    message: 'Zoom Out',
+                    child: Semantics(
+                      label: 'Zoom out from vehicle',
+                      button: true,
+                      child: IconButton(icon: const Icon(Icons.zoom_out, color: Colors.white), onPressed: () {}),
+                    ),
+                  ),
                 ],
               ),
             ),
