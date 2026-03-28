@@ -220,15 +220,15 @@ class HomePage extends StatelessWidget {
                         Expanded(
                           child: Text(
                             vehicle.description,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
                             style: const TextStyle(
                               color: Colors.white54,
                               fontSize: 16,
                             ),
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
                           ),
                         ),
-                        const Spacer(),
+                        const SizedBox(height: 8),
                         ElevatedButton(
                           onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (context) => StudioPage(vehicle: vehicle))),
                           style: ElevatedButton.styleFrom(

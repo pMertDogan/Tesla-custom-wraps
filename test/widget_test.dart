@@ -40,9 +40,11 @@ void main() {
 
     expect(apiKeyTextField, findsOneWidget);
 
-    // Verify it has obscureText set to true.
+    // Verify it has obscureText set to true, and autocorrect/enableSuggestions set to false.
     final TextField textFieldWidget = tester.widget(apiKeyTextField);
     expect(textFieldWidget.obscureText, isTrue);
+    expect(textFieldWidget.autocorrect, isFalse);
+    expect(textFieldWidget.enableSuggestions, isFalse);
   });
 
   testWidgets('StudioPage TextFields have security enhancements', (WidgetTester tester) async {

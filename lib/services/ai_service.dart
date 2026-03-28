@@ -12,10 +12,15 @@ class AIService {
   }
 
   Future<String?> generateWrapImage(String prompt) async {
-    if (_apiKey != null && _baseUrl != null && _selectedProvider != null) {
-      // Logic for API call would go here
+    try {
+      if (_apiKey != null && _baseUrl != null && _selectedProvider != null) {
+        // Logic for API call would go here
+      }
+      await Future.delayed(const Duration(seconds: 2));
+      return null;
+    } catch (e) {
+      // Secure error handling: fail safely and don't leak stack traces or internal details
+      return null;
     }
-    await Future.delayed(const Duration(seconds: 2));
-    return null;
   }
 }
