@@ -13,6 +13,7 @@ class StudioPage extends StatefulWidget {
 class _StudioPageState extends State<StudioPage> {
   final TextEditingController _promptController = TextEditingController();
   String _selectedProvider = 'DALL-E 3';
+  bool _isGenerating = false;
   final List<String> _providers = [
     'DALL-E 3',
     'Midjourney v6',
@@ -117,7 +118,7 @@ class _StudioPageState extends State<StudioPage> {
           TextField(
             controller: _promptController,
             maxLines: 4,
-            maxLength: 2000,
+            maxLength: 1000,
             style: const TextStyle(color: Colors.white),
             decoration: InputDecoration(
               hintText: 'Describe your wrap design...',
@@ -131,15 +132,44 @@ class _StudioPageState extends State<StudioPage> {
             ),
           ),
           const SizedBox(height: 24),
-          ElevatedButton(
-            onPressed: () {},
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.blueAccent,
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(vertical: 20),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          Semantics(
+            label: 'Generate wrap design',
+            button: true,
+            child: ElevatedButton(
+              onPressed: _isGenerating
+                  ? null
+                  : () async {
+                      setState(() => _isGenerating = true);
+                      await Future.delayed(const Duration(seconds: 2));
+                      if (mounted) {
+                        setState(() => _isGenerating = false);
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Wrap design generated successfully!'),
+                              backgroundColor: Colors.blueAccent,
+                            ),
+                          );
+                        }
+                      }
+                    },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.blueAccent,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 20),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+              child: _isGenerating
+                  ? const SizedBox(
+                      height: 20,
+                      width: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
+                    )
+                  : const Text('GENERATE WRAP', style: TextStyle(fontWeight: FontWeight.bold)),
             ),
-            child: const Text('GENERATE WRAP', style: TextStyle(fontWeight: FontWeight.bold)),
           ),
           const Divider(height: 48, color: Colors.white10),
           const Text(
@@ -300,6 +330,7 @@ class _StudioPageState extends State<StudioPage> {
           mainAxisSize: MainAxisSize.min,
           children: [
             TextField(
+              maxLength: 512,
               obscureText: true,
               autocorrect: false,
               enableSuggestions: false,
