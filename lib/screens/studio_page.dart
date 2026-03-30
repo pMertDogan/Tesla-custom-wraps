@@ -271,27 +271,47 @@ class _StudioPageState extends State<StudioPage> {
         color: Color(0xFF141414),
         border: Border(left: BorderSide(color: Colors.white10)),
       ),
-      child: Column(
-        children: [
-          const SizedBox(height: 20),
-          _buildSidebarAction(Icons.brush, 'Draw'),
-          _buildSidebarAction(Icons.text_fields, 'Text'),
-          _buildSidebarAction(Icons.image, 'Logo'),
-          _buildSidebarAction(Icons.layers, 'Layers'),
-        ],
+      child: Material(
+        color: Colors.transparent,
+        child: Column(
+          children: [
+            const SizedBox(height: 20),
+            _buildSidebarAction(Icons.brush, 'Draw'),
+            _buildSidebarAction(Icons.text_fields, 'Text'),
+            _buildSidebarAction(Icons.image, 'Logo'),
+            _buildSidebarAction(Icons.layers, 'Layers'),
+          ],
+        ),
       ),
     );
   }
 
   Widget _buildSidebarAction(IconData icon, String label) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 16),
-      child: Column(
-        children: [
-          Icon(icon, color: Colors.white70, size: 28),
-          const SizedBox(height: 4),
-          Text(label, style: const TextStyle(fontSize: 10, color: Colors.white38)),
-        ],
+    return Tooltip(
+      message: label,
+      child: Semantics(
+        label: label,
+        button: true,
+        child: InkWell(
+          onTap: () {},
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 8),
+            child: SizedBox(
+              width: double.infinity,
+              child: Column(
+                children: [
+                  Icon(icon, color: Colors.white70, size: 28),
+                  const SizedBox(height: 4),
+                  Text(
+                    label,
+                    style: const TextStyle(fontSize: 10, color: Colors.white38),
+                    textAlign: TextAlign.center,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }
