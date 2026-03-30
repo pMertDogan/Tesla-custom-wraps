@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:app/screens/studio_page.dart';
 import 'package:app/models/tesla_model.dart';
@@ -14,12 +15,19 @@ void main() {
       exampleWraps: [],
     );
 
+    // Increase screen size to avoid overflows and ensure all widgets are in view
+    tester.view.physicalSize = const Size(1920, 1080);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
     // Enable semantics for the test
     final SemanticsHandle handle = tester.ensureSemantics();
 
     await tester.pumpWidget(MaterialApp(
       home: StudioPage(vehicle: vehicle),
     ));
+    await tester.pumpAndSettle();
 
     // Check Settings button
     expect(find.byTooltip('Settings'), findsOneWidget);
@@ -32,6 +40,19 @@ void main() {
     // Check Zoom In button
     expect(find.byTooltip('Zoom In'), findsOneWidget);
     expect(find.bySemanticsLabel('Zoom in on vehicle'), findsOneWidget);
+
+    // Check Sidebar Actions
+    expect(find.byTooltip('Draw'), findsOneWidget);
+    expect(find.bySemanticsLabel(RegExp(r'^Draw')), findsAtLeastNWidgets(1));
+
+    expect(find.byTooltip('Text'), findsOneWidget);
+    expect(find.bySemanticsLabel(RegExp(r'^Text')), findsAtLeastNWidgets(1));
+
+    expect(find.byTooltip('Logo'), findsOneWidget);
+    expect(find.bySemanticsLabel(RegExp(r'^Logo')), findsAtLeastNWidgets(1));
+
+    expect(find.byTooltip('Layers'), findsOneWidget);
+    expect(find.bySemanticsLabel(RegExp(r'^Layers')), findsAtLeastNWidgets(1));
 
     handle.dispose();
   });
