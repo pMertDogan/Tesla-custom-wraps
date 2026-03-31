@@ -47,13 +47,27 @@ class _StudioPageState extends State<StudioPage> {
             ),
           ),
           const SizedBox(width: 10),
-          ElevatedButton.icon(
-            onPressed: () {},
-            icon: const Icon(Icons.download),
-            label: const Text('EXPORT WRAP'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.white,
-              foregroundColor: Colors.black,
+          Tooltip(
+            message: 'Export your design',
+            child: Semantics(
+              label: 'Export wrap design',
+              button: true,
+              child: ElevatedButton.icon(
+                onPressed: () {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Preparing wrap for export...'),
+                      backgroundColor: Colors.blueAccent,
+                    ),
+                  );
+                },
+                icon: const Icon(Icons.download),
+                label: const Text('EXPORT WRAP'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.white,
+                  foregroundColor: Colors.black,
+                ),
+              ),
             ),
           ),
           const SizedBox(width: 20),

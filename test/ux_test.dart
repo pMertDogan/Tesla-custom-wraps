@@ -33,6 +33,10 @@ void main() {
     expect(find.byTooltip('Settings'), findsOneWidget);
     expect(find.bySemanticsLabel('Open settings'), findsOneWidget);
 
+    // Check Export button
+    expect(find.byTooltip('Export your design'), findsOneWidget);
+    expect(find.bySemanticsLabel(RegExp(r'^Export wrap design')), findsOneWidget);
+
     // Check Rotate Left button
     expect(find.byTooltip('Rotate Left'), findsOneWidget);
     expect(find.bySemanticsLabel('Rotate vehicle left'), findsOneWidget);
