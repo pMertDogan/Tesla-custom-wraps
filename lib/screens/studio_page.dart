@@ -424,11 +424,12 @@ class _StudioPageState extends State<StudioPage> {
             message: 'Adjust $label',
             child: Semantics(
               label: label,
-              value: '${(value * 100).toInt()}%',
-              slider: true,
               child: Slider(
                 value: value,
                 onChanged: onChanged,
+                divisions: 100,
+                label: '${(value * 100).toInt()}%',
+                semanticFormatterCallback: (double val) => '${(val * 100).toInt()}%',
                 activeColor: Colors.blueAccent,
                 inactiveColor: Colors.white12,
               ),
