@@ -165,7 +165,6 @@ class _StudioPageState extends State<StudioPage> {
             message: 'Generate a new wrap design based on your prompt',
             child: Semantics(
               label: 'Generate wrap design',
-              button: true,
               child: ElevatedButton(
                 onPressed: _isGenerating
                     ? null
