@@ -74,7 +74,10 @@ class HomePage extends StatelessWidget {
     );
   }
 
-  Widget _buildFeaturedSection(BuildContext context, List<TeslaModel> vehicles) {
+  Widget _buildFeaturedSection(
+    BuildContext context,
+    List<TeslaModel> vehicles,
+  ) {
     return Container(
       width: double.infinity,
       height: 600,
@@ -128,13 +131,22 @@ class HomePage extends StatelessWidget {
                 ElevatedButton(
                   onPressed: () {
                     if (vehicles.isNotEmpty) {
-                      Navigator.push(context, MaterialPageRoute(builder: (context) => StudioPage(vehicle: vehicles[0])));
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) =>
+                              StudioPage(vehicle: vehicles[0]),
+                        ),
+                      );
                     }
                   },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.white,
                     foregroundColor: Colors.black,
-                    padding: const EdgeInsets.symmetric(horizontal: 48, vertical: 24),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 48,
+                      vertical: 24,
+                    ),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(4),
                     ),
@@ -150,7 +162,10 @@ class HomePage extends StatelessWidget {
                   style: OutlinedButton.styleFrom(
                     foregroundColor: Colors.white,
                     side: const BorderSide(color: Colors.white, width: 2),
-                    padding: const EdgeInsets.symmetric(horizontal: 48, vertical: 24),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 48,
+                      vertical: 24,
+                    ),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(4),
                     ),
@@ -193,7 +208,9 @@ class HomePage extends StatelessWidget {
                   child: Container(
                     decoration: BoxDecoration(
                       color: const Color(0xFF1E1E1E),
-                      borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+                      borderRadius: const BorderRadius.vertical(
+                        top: Radius.circular(12),
+                      ),
                       image: DecorationImage(
                         image: AssetImage(vehicle.imagePath),
                         fit: BoxFit.contain,
@@ -230,7 +247,13 @@ class HomePage extends StatelessWidget {
                         ),
                         const SizedBox(height: 8),
                         ElevatedButton(
-                          onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (context) => StudioPage(vehicle: vehicle))),
+                          onPressed: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) =>
+                                  StudioPage(vehicle: vehicle),
+                            ),
+                          ),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: Colors.white10,
                             foregroundColor: Colors.white,
@@ -283,19 +306,13 @@ class HomePage extends StatelessWidget {
             child: Stack(
               fit: StackFit.expand,
               children: [
-                Image.asset(
-                  galleryImages[index],
-                  fit: BoxFit.cover,
-                ),
+                Image.asset(galleryImages[index], fit: BoxFit.cover),
                 Container(
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
                       begin: Alignment.bottomCenter,
                       end: Alignment.topCenter,
-                      colors: [
-                        Colors.black.withAlpha(153),
-                        Colors.transparent,
-                      ],
+                      colors: [Colors.black.withAlpha(153), Colors.transparent],
                     ),
                   ),
                 ),

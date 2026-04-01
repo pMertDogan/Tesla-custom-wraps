@@ -5,7 +5,9 @@ import 'package:app/screens/studio_page.dart';
 import 'package:app/models/tesla_model.dart';
 
 void main() {
-  testWidgets('StudioPage has Tooltips and Semantics for icon buttons', (WidgetTester tester) async {
+  testWidgets('StudioPage has Tooltips and Semantics for icon buttons', (
+    WidgetTester tester,
+  ) async {
     final vehicle = TeslaModel(
       id: 'm3',
       name: 'Model 3',
@@ -24,9 +26,7 @@ void main() {
     // Enable semantics for the test
     final SemanticsHandle handle = tester.ensureSemantics();
 
-    await tester.pumpWidget(MaterialApp(
-      home: StudioPage(vehicle: vehicle),
-    ));
+    await tester.pumpWidget(MaterialApp(home: StudioPage(vehicle: vehicle)));
     await tester.pumpAndSettle();
 
     // Check Settings button
@@ -35,7 +35,27 @@ void main() {
 
     // Check Export button
     expect(find.byTooltip('Export your design'), findsOneWidget);
-    expect(find.bySemanticsLabel(RegExp(r'^Export wrap design')), findsOneWidget);
+    expect(
+      find.bySemanticsLabel(RegExp(r'^Export wrap design')),
+      findsOneWidget,
+    );
+
+    // Check Generate button
+    expect(
+      find.byTooltip('Generate a new wrap design based on your prompt'),
+      findsOneWidget,
+    );
+    expect(find.bySemanticsLabel('Generate wrap design'), findsOneWidget);
+
+    // Check Manual Control Sliders
+    expect(find.byTooltip('Adjust Opacity'), findsOneWidget);
+    expect(find.bySemanticsLabel(RegExp(r'^Opacity')), findsOneWidget);
+
+    expect(find.byTooltip('Adjust Metallic'), findsOneWidget);
+    expect(find.bySemanticsLabel(RegExp(r'^Metallic')), findsOneWidget);
+
+    expect(find.byTooltip('Adjust Roughness'), findsOneWidget);
+    expect(find.bySemanticsLabel(RegExp(r'^Roughness')), findsOneWidget);
 
     // Check Rotate Left button
     expect(find.byTooltip('Rotate Left'), findsOneWidget);

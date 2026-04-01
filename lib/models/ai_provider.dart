@@ -3,9 +3,5 @@ class AIProvider {
   final String name;
   final String logoUrl;
 
-  AIProvider({
-    required this.id,
-    required this.name,
-    required this.logoUrl,
-  });
+  AIProvider({required this.id, required this.name, required this.logoUrl});
 }

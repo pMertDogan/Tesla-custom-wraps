@@ -14,6 +14,10 @@ class _StudioPageState extends State<StudioPage> {
   final TextEditingController _promptController = TextEditingController();
   String _selectedProvider = 'DALL-E 3';
   bool _isGenerating = false;
+  double _opacity = 0.8;
+  double _metallic = 0.2;
+  double _roughness = 0.5;
+
   final List<String> _providers = [
     'DALL-E 3',
     'Midjourney v6',
@@ -24,7 +28,7 @@ class _StudioPageState extends State<StudioPage> {
     'Custom Gemini',
     'Mistral AI',
     'Leonardo.ai',
-    'Groq Cloud'
+    'Groq Cloud',
   ];
 
   @override
@@ -76,9 +80,7 @@ class _StudioPageState extends State<StudioPage> {
       body: Row(
         children: [
           _buildSidebar(context),
-          Expanded(
-            child: _buildPreviewArea(context),
-          ),
+          Expanded(child: _buildPreviewArea(context)),
           _buildRightSidebar(context),
         ],
       ),
@@ -105,7 +107,10 @@ class _StudioPageState extends State<StudioPage> {
             ),
           ),
           const SizedBox(height: 24),
-          const Text('AI PROVIDER', style: TextStyle(color: Colors.white54, fontSize: 12)),
+          const Text(
+            'AI PROVIDER',
+            style: TextStyle(color: Colors.white54, fontSize: 12),
+          ),
           const SizedBox(height: 8),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -118,16 +123,26 @@ class _StudioPageState extends State<StudioPage> {
                 value: _selectedProvider,
                 isExpanded: true,
                 dropdownColor: const Color(0xFF1E1E1E),
-                items: _providers.map((p) => DropdownMenuItem(
-                  value: p,
-                  child: Text(p, style: const TextStyle(color: Colors.white)),
-                )).toList(),
+                items: _providers
+                    .map(
+                      (p) => DropdownMenuItem(
+                        value: p,
+                        child: Text(
+                          p,
+                          style: const TextStyle(color: Colors.white),
+                        ),
+                      ),
+                    )
+                    .toList(),
                 onChanged: (val) => setState(() => _selectedProvider = val!),
               ),
             ),
           ),
           const SizedBox(height: 24),
-          const Text('PROMPT', style: TextStyle(color: Colors.white54, fontSize: 12)),
+          const Text(
+            'PROMPT',
+            style: TextStyle(color: Colors.white54, fontSize: 12),
+          ),
           const SizedBox(height: 8),
           TextField(
             controller: _promptController,
@@ -146,43 +161,53 @@ class _StudioPageState extends State<StudioPage> {
             ),
           ),
           const SizedBox(height: 24),
-          Semantics(
-            label: 'Generate wrap design',
-            button: true,
-            child: ElevatedButton(
-              onPressed: _isGenerating
-                  ? null
-                  : () async {
-                      setState(() => _isGenerating = true);
-                      await Future.delayed(const Duration(seconds: 2));
-                      if (mounted) {
-                        setState(() => _isGenerating = false);
-                        if (context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Wrap design generated successfully!'),
-                              backgroundColor: Colors.blueAccent,
-                            ),
-                          );
+          Tooltip(
+            message: 'Generate a new wrap design based on your prompt',
+            child: Semantics(
+              label: 'Generate wrap design',
+              button: true,
+              child: ElevatedButton(
+                onPressed: _isGenerating
+                    ? null
+                    : () async {
+                        setState(() => _isGenerating = true);
+                        await Future.delayed(const Duration(seconds: 2));
+                        if (mounted) {
+                          setState(() => _isGenerating = false);
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text(
+                                  'Wrap design generated successfully!',
+                                ),
+                                backgroundColor: Colors.blueAccent,
+                              ),
+                            );
+                          }
                         }
-                      }
-                    },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.blueAccent,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 20),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-              ),
-              child: _isGenerating
-                  ? const SizedBox(
-                      height: 20,
-                      width: 20,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: Colors.white,
+                      },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.blueAccent,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 20),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+                child: _isGenerating
+                    ? const SizedBox(
+                        height: 20,
+                        width: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                    : const Text(
+                        'GENERATE WRAP',
+                        style: TextStyle(fontWeight: FontWeight.bold),
                       ),
-                    )
-                  : const Text('GENERATE WRAP', style: TextStyle(fontWeight: FontWeight.bold)),
+              ),
             ),
           ),
           const Divider(height: 48, color: Colors.white10),
@@ -196,9 +221,21 @@ class _StudioPageState extends State<StudioPage> {
             ),
           ),
           const SizedBox(height: 16),
-          _buildControlSlider('Opacity', 0.8),
-          _buildControlSlider('Metallic', 0.2),
-          _buildControlSlider('Roughness', 0.5),
+          _buildControlSlider(
+            'Opacity',
+            _opacity,
+            (val) => setState(() => _opacity = val),
+          ),
+          _buildControlSlider(
+            'Metallic',
+            _metallic,
+            (val) => setState(() => _metallic = val),
+          ),
+          _buildControlSlider(
+            'Roughness',
+            _roughness,
+            (val) => setState(() => _roughness = val),
+          ),
         ],
       ),
     );
@@ -223,7 +260,10 @@ class _StudioPageState extends State<StudioPage> {
                   const Positioned(
                     top: 40,
                     child: Chip(
-                      label: Text('3D VIEW PLACEHOLDER', style: TextStyle(color: Colors.white70)),
+                      label: Text(
+                        '3D VIEW PLACEHOLDER',
+                        style: TextStyle(color: Colors.white70),
+                      ),
                       backgroundColor: Colors.white12,
                     ),
                   ),
@@ -241,7 +281,13 @@ class _StudioPageState extends State<StudioPage> {
                     child: Semantics(
                       label: 'Rotate vehicle left',
                       button: true,
-                      child: IconButton(icon: const Icon(Icons.rotate_left, color: Colors.white), onPressed: () {}),
+                      child: IconButton(
+                        icon: const Icon(
+                          Icons.rotate_left,
+                          color: Colors.white,
+                        ),
+                        onPressed: () {},
+                      ),
                     ),
                   ),
                   Tooltip(
@@ -249,7 +295,13 @@ class _StudioPageState extends State<StudioPage> {
                     child: Semantics(
                       label: 'Rotate vehicle right',
                       button: true,
-                      child: IconButton(icon: const Icon(Icons.rotate_right, color: Colors.white), onPressed: () {}),
+                      child: IconButton(
+                        icon: const Icon(
+                          Icons.rotate_right,
+                          color: Colors.white,
+                        ),
+                        onPressed: () {},
+                      ),
                     ),
                   ),
                   const VerticalDivider(color: Colors.white10, width: 40),
@@ -258,7 +310,10 @@ class _StudioPageState extends State<StudioPage> {
                     child: Semantics(
                       label: 'Zoom in on vehicle',
                       button: true,
-                      child: IconButton(icon: const Icon(Icons.zoom_in, color: Colors.white), onPressed: () {}),
+                      child: IconButton(
+                        icon: const Icon(Icons.zoom_in, color: Colors.white),
+                        onPressed: () {},
+                      ),
                     ),
                   ),
                   Tooltip(
@@ -266,7 +321,10 @@ class _StudioPageState extends State<StudioPage> {
                     child: Semantics(
                       label: 'Zoom out from vehicle',
                       button: true,
-                      child: IconButton(icon: const Icon(Icons.zoom_out, color: Colors.white), onPressed: () {}),
+                      child: IconButton(
+                        icon: const Icon(Icons.zoom_out, color: Colors.white),
+                        onPressed: () {},
+                      ),
                     ),
                   ),
                 ],
@@ -307,7 +365,17 @@ class _StudioPageState extends State<StudioPage> {
         label: label,
         button: true,
         child: InkWell(
-          onTap: () {},
+          onTap: () {
+            ScaffoldMessenger.of(context).hideCurrentSnackBar();
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('$label tool selected'),
+                duration: const Duration(seconds: 1),
+                behavior: SnackBarBehavior.floating,
+                width: 200,
+              ),
+            );
+          },
           child: Padding(
             padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 8),
             child: SizedBox(
@@ -330,7 +398,11 @@ class _StudioPageState extends State<StudioPage> {
     );
   }
 
-  Widget _buildControlSlider(String label, double value) {
+  Widget _buildControlSlider(
+    String label,
+    double value,
+    ValueChanged<double> onChanged,
+  ) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),
       child: Column(
@@ -339,15 +411,29 @@ class _StudioPageState extends State<StudioPage> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(label, style: const TextStyle(fontSize: 12, color: Colors.white70)),
-              Text('${(value * 100).toInt()}%', style: const TextStyle(fontSize: 12, color: Colors.white)),
+              Text(
+                label,
+                style: const TextStyle(fontSize: 12, color: Colors.white70),
+              ),
+              Text(
+                '${(value * 100).toInt()}%',
+                style: const TextStyle(fontSize: 12, color: Colors.white),
+              ),
             ],
           ),
-          Slider(
-            value: value,
-            onChanged: (val) {},
-            activeColor: Colors.blueAccent,
-            inactiveColor: Colors.white12,
+          Tooltip(
+            message: 'Adjust $label',
+            child: Semantics(
+              label: label,
+              value: '${(value * 100).toInt()}%',
+              slider: true,
+              child: Slider(
+                value: value,
+                onChanged: onChanged,
+                activeColor: Colors.blueAccent,
+                inactiveColor: Colors.white12,
+              ),
+            ),
           ),
         ],
       ),
@@ -359,7 +445,10 @@ class _StudioPageState extends State<StudioPage> {
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: const Color(0xFF1E1E1E),
-        title: const Text('API SETTINGS', style: TextStyle(color: Colors.white)),
+        title: const Text(
+          'API SETTINGS',
+          style: TextStyle(color: Colors.white),
+        ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -372,8 +461,12 @@ class _StudioPageState extends State<StudioPage> {
               decoration: const InputDecoration(
                 labelText: 'API KEY',
                 labelStyle: TextStyle(color: Colors.white54),
-                enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: Colors.white10)),
-                focusedBorder: OutlineInputBorder(borderSide: BorderSide(color: Colors.blueAccent)),
+                enabledBorder: OutlineInputBorder(
+                  borderSide: BorderSide(color: Colors.white10),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderSide: BorderSide(color: Colors.blueAccent),
+                ),
               ),
             ),
             const SizedBox(height: 16),
@@ -384,15 +477,25 @@ class _StudioPageState extends State<StudioPage> {
                 labelText: 'CUSTOM BASE URL (Optional)',
                 labelStyle: TextStyle(color: Colors.white54),
                 helperText: 'Use HTTPS for secure communication',
-                enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: Colors.white10)),
-                focusedBorder: OutlineInputBorder(borderSide: BorderSide(color: Colors.blueAccent)),
+                enabledBorder: OutlineInputBorder(
+                  borderSide: BorderSide(color: Colors.white10),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderSide: BorderSide(color: Colors.blueAccent),
+                ),
               ),
             ),
           ],
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('CANCEL')),
-          ElevatedButton(onPressed: () => Navigator.pop(context), child: const Text('SAVE')),
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('CANCEL'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('SAVE'),
+          ),
         ],
       ),
     );
