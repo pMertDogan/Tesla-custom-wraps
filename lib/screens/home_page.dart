@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'studio_page.dart';
+import 'gallery_page.dart';
 import '../models/tesla_model.dart';
 import '../services/vehicle_service.dart';
 
@@ -25,12 +26,40 @@ class HomePage extends StatelessWidget {
         ),
         actions: [
           TextButton(
-            onPressed: () {},
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const GalleryPage()),
+              );
+            },
             child: const Text('GALLERY', style: TextStyle(color: Colors.white)),
           ),
           const SizedBox(width: 10),
           TextButton(
-            onPressed: () {},
+            onPressed: () {
+              if (vehicles.isNotEmpty) {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => StudioPage(vehicle: vehicles[0]),
+                  ),
+                );
+              }
+            },
+            child: const Text('STUDIO', style: TextStyle(color: Colors.white)),
+          ),
+          const SizedBox(width: 10),
+          TextButton(
+            onPressed: () {
+              if (vehicles.isNotEmpty) {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => StudioPage(vehicle: vehicles[0]),
+                  ),
+                );
+              }
+            },
             child: const Text('STUDIO', style: TextStyle(color: Colors.white)),
           ),
           const SizedBox(width: 20),
@@ -158,7 +187,12 @@ class HomePage extends StatelessWidget {
                 ),
                 const SizedBox(width: 24),
                 OutlinedButton(
-                  onPressed: () {},
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => const GalleryPage()),
+                    );
+                  },
                   style: OutlinedButton.styleFrom(
                     foregroundColor: Colors.white,
                     side: const BorderSide(color: Colors.white, width: 2),

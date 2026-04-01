@@ -3,6 +3,8 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:app/screens/studio_page.dart';
 import 'package:app/models/tesla_model.dart';
+import 'package:app/providers/design_provider.dart';
+import 'package:provider/provider.dart';
 
 void main() {
   testWidgets('StudioPage has Tooltips and Semantics for icon buttons', (
@@ -26,7 +28,12 @@ void main() {
     // Enable semantics for the test
     final SemanticsHandle handle = tester.ensureSemantics();
 
-    await tester.pumpWidget(MaterialApp(home: StudioPage(vehicle: vehicle)));
+    await tester.pumpWidget(
+      ChangeNotifierProvider(
+        create: (_) => DesignProvider(),
+        child: MaterialApp(home: StudioPage(vehicle: vehicle)),
+      ),
+    );
     await tester.pumpAndSettle();
 
     // Check Settings button
