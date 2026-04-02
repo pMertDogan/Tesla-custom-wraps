@@ -316,10 +316,31 @@ class HomePage extends StatelessWidget {
                     ),
                   ),
                 ),
-                const Positioned(
-                  bottom: 12,
-                  left: 12,
-                  child: Icon(Icons.favorite_border, color: Colors.white70),
+                Positioned(
+                  bottom: 4,
+                  left: 4,
+                  child: Tooltip(
+                    message: 'Like this design',
+                    child: Semantics(
+                      label: 'Like design',
+                      button: true,
+                      child: IconButton(
+                        icon:
+                            const Icon(Icons.favorite_border, color: Colors.white70),
+                        onPressed: () {
+                          ScaffoldMessenger.of(context).hideCurrentSnackBar();
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Added to your favorites!'),
+                              duration: Duration(seconds: 2),
+                              behavior: SnackBarBehavior.floating,
+                              width: 250,
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ),
                 ),
               ],
             ),
