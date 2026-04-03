@@ -28,8 +28,7 @@ void main() {
 
     // Test SnackBar on click
     await tester.tap(find.byTooltip('Like this design').first);
-    await tester.pump(); // Start animation
-    await tester.pump(const Duration(milliseconds: 500)); // Wait for snackbar to appear
+    await tester.pumpAndSettle();
 
     expect(find.text('Added to your favorites!'), findsOneWidget);
 
