@@ -20,7 +20,7 @@ void main() {
 
     // Check Like buttons in gallery
     expect(find.byTooltip('Like this design'), findsAtLeastNWidgets(1));
-    expect(find.bySemanticsLabel('Like design'), findsAtLeastNWidgets(1));
+    expect(find.bySemanticsLabel('Like this design'), findsAtLeastNWidgets(1));
 
     // Scroll down manually to reveal the gallery
     await tester.drag(find.byType(SingleChildScrollView), const Offset(0, -1000));
