@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:model_viewer_plus/model_viewer_plus.dart';
 import '../models/tesla_model.dart';
 
 class StudioPage extends StatefulWidget {
@@ -25,6 +26,34 @@ class _StudioPageState extends State<StudioPage> {
     'Leonardo.ai',
     'Groq Cloud'
   ];
+
+  double _theta = 0;
+  final double _phi = 75;
+  double _zoom = 105;
+
+  void _rotateLeft() {
+    setState(() {
+      _theta -= 15;
+    });
+  }
+
+  void _rotateRight() {
+    setState(() {
+      _theta += 15;
+    });
+  }
+
+  void _zoomIn() {
+    setState(() {
+      if (_zoom > 50) _zoom -= 10;
+    });
+  }
+
+  void _zoomOut() {
+    setState(() {
+      if (_zoom < 200) _zoom += 10;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -156,45 +185,36 @@ class _StudioPageState extends State<StudioPage> {
   Widget _buildPreviewArea(BuildContext context) {
     return Container(
       color: Colors.black,
-      child: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Expanded(
-              child: Stack(
-                alignment: Alignment.center,
-                children: [
-                  Image.asset(
-                    widget.vehicle.imagePath,
-                    width: 800,
-                    fit: BoxFit.contain,
-                  ),
-                  const Positioned(
-                    top: 40,
-                    child: Chip(
-                      label: Text('3D VIEW PLACEHOLDER', style: TextStyle(color: Colors.white70)),
-                      backgroundColor: Colors.white12,
-                    ),
-                  ),
-                ],
-              ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Expanded(
+            child: ModelViewer(
+              key: ValueKey(widget.vehicle.glbPath + _theta.toString() + _phi.toString() + _zoom.toString()),
+              src: widget.vehicle.glbPath,
+              alt: widget.vehicle.name,
+              ar: true,
+              autoRotate: false,
+              cameraControls: true,
+              cameraOrbit: '$_theta deg $_phi deg $_zoom%',
+              backgroundColor: Colors.black,
             ),
-            Container(
-              height: 60,
-              color: Colors.white.withAlpha(5),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  IconButton(icon: const Icon(Icons.rotate_left, color: Colors.white), onPressed: () {}),
-                  IconButton(icon: const Icon(Icons.rotate_right, color: Colors.white), onPressed: () {}),
-                  const VerticalDivider(color: Colors.white10, width: 40),
-                  IconButton(icon: const Icon(Icons.zoom_in, color: Colors.white), onPressed: () {}),
-                  IconButton(icon: const Icon(Icons.zoom_out, color: Colors.white), onPressed: () {}),
-                ],
-              ),
+          ),
+          Container(
+            height: 60,
+            color: Colors.white.withAlpha(5),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                IconButton(icon: const Icon(Icons.rotate_left, color: Colors.white), onPressed: _rotateLeft),
+                IconButton(icon: const Icon(Icons.rotate_right, color: Colors.white), onPressed: _rotateRight),
+                const VerticalDivider(color: Colors.white10, width: 40),
+                IconButton(icon: const Icon(Icons.zoom_in, color: Colors.white), onPressed: _zoomIn),
+                IconButton(icon: const Icon(Icons.zoom_out, color: Colors.white), onPressed: _zoomOut),
+              ],
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
