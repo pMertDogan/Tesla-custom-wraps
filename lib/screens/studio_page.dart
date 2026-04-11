@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:model_viewer_plus/model_viewer_plus.dart';
 import '../models/tesla_model.dart';
 
 class StudioPage extends StatefulWidget {
@@ -30,6 +31,34 @@ class _StudioPageState extends State<StudioPage> {
     'Leonardo.ai',
     'Groq Cloud',
   ];
+
+  double _theta = 0;
+  final double _phi = 75;
+  double _zoom = 105;
+
+  void _rotateLeft() {
+    setState(() {
+      _theta -= 15;
+    });
+  }
+
+  void _rotateRight() {
+    setState(() {
+      _theta += 15;
+    });
+  }
+
+  void _zoomIn() {
+    setState(() {
+      if (_zoom > 50) _zoom -= 10;
+    });
+  }
+
+  void _zoomOut() {
+    setState(() {
+      if (_zoom < 200) _zoom += 10;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -329,8 +358,8 @@ class _StudioPageState extends State<StudioPage> {
                 ],
               ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }

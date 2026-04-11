@@ -4,6 +4,7 @@ class TeslaModel {
   final String description;
   final String imagePath;
   final String templatePath;
+  final String glbPath;
   final List<String> exampleWraps;
 
   TeslaModel({
@@ -12,6 +13,7 @@ class TeslaModel {
     required this.description,
     required this.imagePath,
     required this.templatePath,
+    required this.glbPath,
     required this.exampleWraps,
   });
 }
