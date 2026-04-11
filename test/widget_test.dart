@@ -7,17 +7,51 @@ import 'package:model_viewer_plus/model_viewer_plus.dart';
 
 void main() {
   testWidgets('App smoke test', (WidgetTester tester) async {
-    await tester.pumpWidget(const MyApp());
+    // Build our app and trigger a frame.
+    // Wrap in a large enough Container to avoid overflow in some test environments.
+    await tester.pumpWidget(
+      const SizedBox(width: 2000, height: 2000, child: MyApp()),
+    );
+
+    // Verify that the title is present.
     expect(find.text('TESLA WRAP STUDIO'), findsOneWidget);
   });
 
-  testWidgets('StudioPage displays ModelViewer', (WidgetTester tester) async {
+  testWidgets('StudioPage settings dialog has obscured API key field', (
+    WidgetTester tester,
+  ) async {
     final vehicle = VehicleService.getVehicles().first;
-    // We can't easily test ModelViewer in unit tests because of WebView platform dependency.
-    // However, we can check if the widget exists in the tree before it tries to initialize the platform part.
-    await tester.pumpWidget(MaterialApp(
-      home: StudioPage(vehicle: vehicle),
-    ));
+
+    await tester.pumpWidget(MaterialApp(home: StudioPage(vehicle: vehicle)));
+
+    // Find and tap the settings button.
+    await tester.tap(find.byIcon(Icons.settings));
+    await tester.pumpAndSettle();
+
+    // Verify the dialog is shown.
+    expect(find.text('API SETTINGS'), findsOneWidget);
+
+    // Find the API KEY TextField.
+    final apiKeyTextField = find.ancestor(
+      of: find.text('API KEY'),
+      matching: find.byType(TextField),
+    );
+
+    expect(apiKeyTextField, findsOneWidget);
+
+    // Verify it has obscureText set to true, and autocorrect/enableSuggestions set to false.
+    final TextField textFieldWidget = tester.widget(apiKeyTextField);
+    expect(textFieldWidget.obscureText, isTrue);
+    expect(textFieldWidget.autocorrect, isFalse);
+    expect(textFieldWidget.enableSuggestions, isFalse);
+  });
+
+  testWidgets('StudioPage TextFields have security enhancements', (
+    WidgetTester tester,
+  ) async {
+    final vehicle = VehicleService.getVehicles().first;
+
+    await tester.pumpWidget(MaterialApp(home: StudioPage(vehicle: vehicle)));
 
     expect(find.byType(ModelViewer), findsOneWidget);
   });
