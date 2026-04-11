@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:model_viewer_plus/model_viewer_plus.dart';
+// import 'package:model_viewer_plus/model_viewer_plus.dart';
 import '../models/tesla_model.dart';
 
 class StudioPage extends StatefulWidget {
@@ -272,8 +272,8 @@ class _StudioPageState extends State<StudioPage> {
   Widget _buildPreviewArea(BuildContext context) {
     return Container(
       color: Colors.black,
-      child: Center(
-        child: Column(
+      child: Center(child:
+        Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Expanded(
@@ -314,7 +314,7 @@ class _StudioPageState extends State<StudioPage> {
                           Icons.rotate_left,
                           color: Colors.white,
                         ),
-                        onPressed: () {},
+                        onPressed: _rotateLeft,
                       ),
                     ),
                   ),
@@ -328,7 +328,7 @@ class _StudioPageState extends State<StudioPage> {
                           Icons.rotate_right,
                           color: Colors.white,
                         ),
-                        onPressed: () {},
+                        onPressed: _rotateRight,
                       ),
                     ),
                   ),
@@ -340,7 +340,7 @@ class _StudioPageState extends State<StudioPage> {
                       button: true,
                       child: IconButton(
                         icon: const Icon(Icons.zoom_in, color: Colors.white),
-                        onPressed: () {},
+                        onPressed: _zoomIn,
                       ),
                     ),
                   ),
@@ -351,15 +351,15 @@ class _StudioPageState extends State<StudioPage> {
                       button: true,
                       child: IconButton(
                         icon: const Icon(Icons.zoom_out, color: Colors.white),
-                        onPressed: () {},
+                        onPressed: _zoomOut,
                       ),
                     ),
                   ),
                 ],
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

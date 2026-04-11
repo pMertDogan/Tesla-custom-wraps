@@ -14,6 +14,7 @@ void main() {
       description: 'Test description',
       imagePath: 'assets/model3/vehicle_image.png',
       templatePath: 'assets/model3/template.png',
+      glbPath: 'assets/models/model3.glb',
       exampleWraps: [],
     );
 
