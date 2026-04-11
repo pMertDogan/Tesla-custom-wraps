@@ -190,7 +190,7 @@ class _StudioPageState extends State<StudioPage> {
         children: [
           Expanded(
             child: ModelViewer(
-              key: ValueKey(widget.vehicle.glbPath + _theta.toString() + _phi.toString() + _zoom.toString()),
+              key: ValueKey(widget.vehicle.glbPath),
               src: widget.vehicle.glbPath,
               alt: widget.vehicle.name,
               ar: true,
