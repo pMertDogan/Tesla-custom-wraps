@@ -47,10 +47,10 @@ Uint8List _noisyPng(int width, int height) {
   return img.encodePng(image, level: 6);
 }
 
-/// Builds a template-like image with a hollow black rectangle.
+/// Builds a template in Tesla's format: a transparent field, an opaque cut
+/// line and the opaque panel inside it.
 Uint8List _templateWithPanel(int size) {
-  final image = img.Image(width: size, height: size);
-  img.fill(image, color: img.ColorRgb8(255, 255, 255));
+  final image = img.Image(width: size, height: size, numChannels: 4);
 
   final outer = size ~/ 4;
   final inner = outer + 2;
@@ -62,7 +62,7 @@ Uint8List _templateWithPanel(int size) {
     y1: outer,
     x2: end,
     y2: end,
-    color: img.ColorRgb8(0, 0, 0),
+    color: img.ColorRgba8(0, 0, 0, 255),
   );
   img.fillRect(
     image,
@@ -70,7 +70,7 @@ Uint8List _templateWithPanel(int size) {
     y1: inner,
     x2: end - 2,
     y2: end - 2,
-    color: img.ColorRgb8(255, 255, 255),
+    color: img.ColorRgba8(255, 255, 255, 255),
   );
 
   return img.encodePng(image);

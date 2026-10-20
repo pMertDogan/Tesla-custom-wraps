@@ -9,9 +9,9 @@ import 'package:image/image.dart' as img;
 /// the panel interiors are white. A finished wrap keeps that exact layout, the
 /// artwork is clipped to the panels and the gaps in between stay empty.
 ///
-/// The mask is derived by flooding the white background of the template from
-/// the image border. Everything the flood cannot reach is inside a closed
-/// panel outline and therefore paintable.
+/// The mask is derived from the alpha channel of the template. Transparent
+/// pixels are the space around and between the panels, every opaque pixel
+/// carries artwork.
 class PanelMask {
   /// Mask width in pixels.
   final int width;
@@ -41,17 +41,23 @@ class PanelMask {
 }
 
 /// Builds and applies panel masks for Tesla's wrap templates.
+///
+/// Tesla's templates are RGBA line art with two distinct kinds of pixel:
+///
+/// - **transparent** — the empty space around and between the body panels,
+/// - **opaque** — everything that belongs to the wrap: the inside of a body
+///   panel and the cut lines between them.
+///
+/// Tesla's own example wraps paint the cut lines as well, the artwork runs
+/// across the seams from one panel to the next. The cut line is a black
+/// stroke in the template only so the installer knows where to slice the
+/// vinyl, it is not an area that stays unpainted. The mask therefore follows
+/// the alpha channel: opaque in, transparent out.
 class TemplateMasker {
   const TemplateMasker._();
 
-  /// Luminance below which a template pixel counts as a stroke.
-  static const int strokeThreshold = 140;
-
-  /// How many pixels the strokes are grown by before flooding.
-  ///
-  /// Growing the strokes seals the hairline gaps anti-aliased line art can
-  /// leave behind, which would otherwise let the flood leak into a panel.
-  static const int strokeDilation = 2;
+  /// Alpha below which a template pixel counts as empty space.
+  static const int alphaThreshold = 128;
 
   /// Derives the panel mask of a template.
   ///
@@ -62,35 +68,28 @@ class TemplateMasker {
 
     final width = template.width;
     final height = template.height;
-    final rgba = template.getBytes(order: img.ChannelOrder.rgba);
     final pixelCount = width * height;
 
-    final strokes = Uint8List(pixelCount);
-    for (var i = 0; i < pixelCount; i++) {
-      final offset = i * 4;
-      final luminance = (0.299 * rgba[offset] +
-              0.587 * rgba[offset + 1] +
-              0.114 * rgba[offset + 2])
-          .round();
-      strokes[i] = luminance < strokeThreshold ? 1 : 0;
-    }
-
-    final sealed = _dilate(strokes, width, height, strokeDilation);
-    final background = _floodFromBorder(sealed, width, height);
+    final source = template.numChannels == 4
+        ? template
+        : template.convert(numChannels: 4);
+    final rgba = source.getBytes(order: img.ChannelOrder.rgba);
 
     final paintable = Uint8List(pixelCount);
     var paintableCount = 0;
+
     for (var i = 0; i < pixelCount; i++) {
-      if (sealed[i] == 0 && background[i] == 0) {
-        paintable[i] = 1;
-        paintableCount++;
-      }
+      // Empty space carries no alpha and never takes paint.
+      if (rgba[i * 4 + 3] < alphaThreshold) continue;
+
+      paintable[i] = 1;
+      paintableCount++;
     }
 
-    // A flood that reached almost everything means the outlines were not
-    // closed. Rather than returning an empty mask, hand back a mask that
-    // keeps the whole canvas so the raw design survives untouched.
-    if (paintableCount < pixelCount * 0.02) {
+    // A template without a single panel pixel is not a template. Rather than
+    // handing back an empty mask, keep the whole canvas so the raw design
+    // survives untouched.
+    if (paintableCount == 0) {
       return PanelMask(
         width: width,
         height: height,
@@ -122,7 +121,9 @@ class TemplateMasker {
   static img.Image applyMaskToImage(img.Image artwork, PanelMask mask) {
     final width = artwork.width;
     final height = artwork.height;
-    final rgba = artwork.getBytes(order: img.ChannelOrder.rgba);
+    final source =
+        artwork.numChannels == 4 ? artwork : artwork.convert(numChannels: 4);
+    final rgba = source.getBytes(order: img.ChannelOrder.rgba);
 
     final maskWidth = mask.width;
     final maskHeight = mask.height;
@@ -148,80 +149,5 @@ class TemplateMasker {
       bytesOffset: rgba.offsetInBytes,
       numChannels: 4,
     );
-  }
-
-  /// Grows the stroke mask so hairline gaps in the line art are closed.
-  static Uint8List _dilate(
-    Uint8List strokes,
-    int width,
-    int height,
-    int radius,
-  ) {
-    var current = strokes;
-    for (var pass = 0; pass < radius; pass++) {
-      final next = Uint8List(current.length);
-      for (var y = 0; y < height; y++) {
-        for (var x = 0; x < width; x++) {
-          var hit = 0;
-          for (var dy = -1; dy <= 1 && hit == 0; dy++) {
-            final ny = y + dy;
-            if (ny < 0 || ny >= height) continue;
-            for (var dx = -1; dx <= 1; dx++) {
-              final nx = x + dx;
-              if (nx < 0 || nx >= width) continue;
-              if (current[ny * width + nx] != 0) {
-                hit = 1;
-                break;
-              }
-            }
-          }
-          next[y * width + x] = hit;
-        }
-      }
-      current = next;
-    }
-    return current;
-  }
-
-  /// Marks every pixel reachable from the border without crossing a stroke.
-  static Uint8List _floodFromBorder(
-    Uint8List strokes,
-    int width,
-    int height,
-  ) {
-    final reached = Uint8List(width * height);
-    final queue = Int32List(width * height);
-    var head = 0;
-    var tail = 0;
-
-    void visit(int x, int y) {
-      final index = y * width + x;
-      if (reached[index] != 0) return;
-      if (strokes[index] != 0) return;
-      reached[index] = 1;
-      queue[tail++] = index;
-    }
-
-    for (var x = 0; x < width; x++) {
-      visit(x, 0);
-      visit(x, height - 1);
-    }
-    for (var y = 0; y < height; y++) {
-      visit(0, y);
-      visit(width - 1, y);
-    }
-
-    while (head < tail) {
-      final index = queue[head++];
-      final x = index % width;
-      final y = index ~/ width;
-
-      if (x > 0) visit(x - 1, y);
-      if (x < width - 1) visit(x + 1, y);
-      if (y > 0) visit(x, y - 1);
-      if (y < height - 1) visit(x, y + 1);
-    }
-
-    return reached;
   }
 }
