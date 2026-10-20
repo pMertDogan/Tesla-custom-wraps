@@ -68,7 +68,7 @@ Future<void> main(List<String> arguments) async {
   final apiKey = _resolveApiKey(provider);
   if (apiKey == null) {
     stderr.writeln(
-      'No API key found. Set ${provider.kind == AiProviderKind.gemini ? 'GEMINI_API_KEY' : 'OPENAI_API_KEY'}.',
+      'No API key found. Set ${_apiKeyEnvName(provider)}.',
     );
     exitCode = 64;
     return;
@@ -91,9 +91,13 @@ Future<void> main(List<String> arguments) async {
       settings: settings,
       prompt: prompt,
       referenceImage: templateBytes,
+      aspectRatio: vehicle.aspectRatio,
     );
 
     stdout.writeln('Received ${result.bytes.length} bytes (${result.mimeType}).');
+    if (result.cost != null) {
+      stdout.writeln('Cost   : \$${result.cost!.toStringAsFixed(4)}');
+    }
 
     final mask = TemplateMasker.buildMask(templateBytes);
     final cropped = WrapExporter.coverCropToTemplate(
@@ -231,9 +235,11 @@ String? _resolveApiKey(AiProvider provider) {
   final fromArgs = Platform.environment['WRAP_API_KEY'];
   if (fromArgs != null && fromArgs.trim().isNotEmpty) return fromArgs.trim();
 
-  final names = provider.kind == AiProviderKind.gemini
-      ? ['GEMINI_API_KEY', 'GOOGLE_API_KEY']
-      : ['OPENAI_API_KEY'];
+  final names = switch (provider.kind) {
+    AiProviderKind.gemini => ['GEMINI_API_KEY', 'GOOGLE_API_KEY'],
+    AiProviderKind.openRouterImages => ['OPENROUTER_API_KEY'],
+    AiProviderKind.openaiImages => ['OPENAI_API_KEY'],
+  };
 
   for (final name in names) {
     final value = Platform.environment[name];
@@ -241,6 +247,13 @@ String? _resolveApiKey(AiProvider provider) {
   }
   return null;
 }
+
+/// Environment variable that holds the key for [provider].
+String _apiKeyEnvName(AiProvider provider) => switch (provider.kind) {
+      AiProviderKind.gemini => 'GEMINI_API_KEY',
+      AiProviderKind.openRouterImages => 'OPENROUTER_API_KEY',
+      AiProviderKind.openaiImages => 'OPENAI_API_KEY',
+    };
 
 const String _usage = '''
 Generate a Tesla wrap with an AI provider.
@@ -263,5 +276,6 @@ Options:
 Environment:
   GEMINI_API_KEY      Key for the Gemini providers
   OPENAI_API_KEY      Key for the OpenAI compatible providers
-  WRAP_API_KEY        Overrides both
+  OPENROUTER_API_KEY  Key for the OpenRouter providers
+  WRAP_API_KEY        Overrides all of them
 ''';

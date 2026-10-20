@@ -34,7 +34,13 @@ class GeneratedImage {
   /// MIME type of [bytes].
   final String mimeType;
 
-  const GeneratedImage(this.bytes, this.mimeType);
+  /// What the provider charged for this image, in USD.
+  ///
+  /// Only providers that report a price (OpenRouter) fill this in. It lets
+  /// the studio show what a generation cost.
+  final double? cost;
+
+  const GeneratedImage(this.bytes, this.mimeType, {this.cost});
 }
 
 /// Talks to text-to-image providers and turns them into wrap textures.
@@ -54,12 +60,15 @@ class AiService {
   /// [prompt] should already contain the wrap contract, see
   /// `WrapPromptBuilder`. [referenceImage] is Tesla's UV template for the
   /// vehicle; it is only sent to providers that support reference images.
+  /// [aspectRatio] is the template's aspect ratio (for example `4:3`); it is
+  /// only used by providers that expose a ratio control.
   Future<GeneratedImage> generate({
     required AiProvider provider,
     required AiSettings settings,
     required String prompt,
     Uint8List? referenceImage,
     String referenceMimeType = 'image/png',
+    String? aspectRatio,
   }) async {
     if (!settings.hasApiKey) {
       throw const AiException(
@@ -84,6 +93,15 @@ class AiService {
           provider: provider,
           settings: settings,
           prompt: prompt,
+        );
+      case AiProviderKind.openRouterImages:
+        return _generateWithOpenRouter(
+          provider: provider,
+          settings: settings,
+          prompt: prompt,
+          referenceImage: effectiveReference,
+          referenceMimeType: referenceMimeType,
+          aspectRatio: aspectRatio,
         );
     }
   }
@@ -261,6 +279,165 @@ class AiService {
     throw const AiException('The provider did not return an image.');
   }
 
+  /// Generates a wrap through OpenRouter's dedicated Image API.
+  ///
+  /// OpenRouter accepts the UV template as an `input_references` entry, so
+  /// the artwork is laid out against the real panels instead of a text
+  /// description of them. The endpoint is `POST /api/v1/images` and answers
+  /// with `data[0].b64_json`.
+  Future<GeneratedImage> _generateWithOpenRouter({
+    required AiProvider provider,
+    required AiSettings settings,
+    required String prompt,
+    Uint8List? referenceImage,
+    String referenceMimeType = 'image/png',
+    String? aspectRatio,
+  }) async {
+    final baseUrl = _effectiveBaseUrl(provider, settings);
+    final model = _effectiveModel(provider, settings);
+    final apiKey = settings.apiKey.trim();
+    final uri = _openRouterImagesUri(baseUrl);
+
+    final body = <String, dynamic>{
+      'model': model,
+      'prompt': prompt,
+      'n': 1,
+    };
+
+    // `output_format` is deliberately left out: several OpenRouter models
+    // reject it outright, and the exporter re-encodes the result to PNG
+    // anyway.
+    if (aspectRatio != null && aspectRatio.isNotEmpty) {
+      body['aspect_ratio'] = aspectRatio;
+    }
+
+    if (referenceImage != null) {
+      body['input_references'] = [
+        {
+          'type': 'image_url',
+          'image_url': {
+            'url': 'data:$referenceMimeType;base64,'
+                '${base64Encode(referenceImage)}',
+          },
+        },
+      ];
+    }
+
+    var response = await _postOpenRouter(
+      uri,
+      apiKey,
+      body,
+      provider: provider,
+    );
+
+    // Not every model accepts every ratio. When the ratio is rejected we
+    // retry once without it and let the exporter crop to the template.
+    if (response.statusCode == 400 &&
+        aspectRatio != null &&
+        body.containsKey('aspect_ratio')) {
+      final retryBody = Map<String, dynamic>.of(body)..remove('aspect_ratio');
+      response = await _postOpenRouter(
+        uri,
+        apiKey,
+        retryBody,
+        provider: provider,
+      );
+    }
+
+    final decoded = _decodeBody(response.body);
+
+    if (response.statusCode != 200) {
+      throw AiException(
+        _describeProviderError(
+          provider,
+          response.statusCode,
+          decoded,
+          model: model,
+        ),
+        statusCode: response.statusCode,
+        detail: response.body,
+      );
+    }
+
+    final data = decoded?['data'];
+    if (data is! List || data.isEmpty) {
+      throw const AiException(
+        'OpenRouter did not return an image. Try rephrasing your description.',
+      );
+    }
+
+    final first = data.first;
+    if (first is! Map) {
+      throw const AiException('OpenRouter returned an unexpected payload.');
+    }
+
+    final b64 = first['b64_json'];
+    if (b64 is String && b64.isNotEmpty) {
+      final mediaType = first['media_type'];
+      return GeneratedImage(
+        base64Decode(b64),
+        mediaType is String && mediaType.isNotEmpty
+            ? mediaType
+            : 'image/png',
+        cost: _extractCost(decoded),
+      );
+    }
+
+    throw const AiException('OpenRouter did not return an image.');
+  }
+
+  /// Reads the USD cost OpenRouter reports for a generation.
+  double? _extractCost(Map<String, dynamic>? decoded) {
+    if (decoded == null) return null;
+    final usage = decoded['usage'];
+    if (usage is! Map) return null;
+    final cost = usage['cost'];
+    if (cost is num) return cost.toDouble();
+    if (cost is String) return double.tryParse(cost);
+    return null;
+  }
+
+  Future<http.Response> _postOpenRouter(
+    Uri uri,
+    String apiKey,
+    Map<String, dynamic> body, {
+    required AiProvider provider,
+  }) async {
+    try {
+      return await _client
+          .post(
+            uri,
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': 'Bearer $apiKey',
+            },
+            body: jsonEncode(body),
+          )
+          .timeout(requestTimeout);
+    } on Exception catch (error) {
+      throw AiException(
+        'Could not reach ${provider.label}. Check your connection and try '
+        'again.',
+        detail: error.toString(),
+      );
+    }
+  }
+
+  /// Normalises a base URL into OpenRouter's image endpoint.
+  Uri _openRouterImagesUri(String baseUrl) {
+    var base = baseUrl.trim();
+    while (base.endsWith('/')) {
+      base = base.substring(0, base.length - 1);
+    }
+    if (base.endsWith('/images')) {
+      return Uri.parse(base);
+    }
+    if (base.endsWith('/v1')) {
+      return Uri.parse('$base/images');
+    }
+    return Uri.parse('$base/v1/images');
+  }
+
   String _effectiveBaseUrl(AiProvider provider, AiSettings settings) {
     final raw = settings.hasBaseUrlOverride
         ? settings.baseUrlOverride!.trim()
@@ -354,6 +531,10 @@ class AiService {
     if (statusCode == 401 || statusCode == 403) {
       return 'Your API key was rejected by ${provider.label}. Check it in '
           'Settings.';
+    }
+    if (statusCode == 402) {
+      return '${provider.label} has no credit left for image generation. Add '
+          'credits to the account and try again.';
     }
     if (statusCode == 404) {
       final modelName = model ?? provider.model;

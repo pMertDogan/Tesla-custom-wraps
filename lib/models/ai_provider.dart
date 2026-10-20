@@ -5,6 +5,13 @@ enum AiProviderKind {
 
   /// OpenAI-compatible `POST /v1/images/generations`.
   openaiImages,
+
+  /// OpenRouter dedicated Image API `POST /api/v1/images`.
+  ///
+  /// OpenRouter speaks its own dialect: it accepts the UV template as an
+  /// `input_references` entry, which is what keeps the generated artwork
+  /// aligned with the vehicle panels.
+  openRouterImages,
 }
 
 /// A text-to-image provider the studio can talk to.
@@ -163,6 +170,62 @@ class AiProviderCatalog {
     supportsReferenceImage: false,
   );
 
+  /// OpenRouter with FLUX 3 Image Klein, the cheapest model on the platform.
+  static const AiProvider openRouterFluxKlein = AiProvider(
+    id: 'openrouter-flux-3-image-klein',
+    label: 'OpenRouter FLUX 3 Klein',
+    vendor: 'OpenRouter',
+    description: 'Cheapest OpenRouter image model (about \$0.008 per image). '
+        'Sends the UV template as a reference image.',
+    kind: AiProviderKind.openRouterImages,
+    baseUrl: 'https://openrouter.ai/api/v1',
+    model: 'black-forest-labs/flux-3-image-klein',
+    supportsReferenceImage: true,
+    docsUrl: 'https://openrouter.ai/keys',
+  );
+
+  /// OpenRouter with Qwen Image 2.1 Turbo.
+  static const AiProvider openRouterQwenTurbo = AiProvider(
+    id: 'openrouter-qwen-image-2.1-turbo',
+    label: 'OpenRouter Qwen Image 2.1 Turbo',
+    vendor: 'OpenRouter',
+    description: 'Fast and inexpensive OpenRouter model (about \$0.018 per '
+        'image). Sends the UV template as a reference image.',
+    kind: AiProviderKind.openRouterImages,
+    baseUrl: 'https://openrouter.ai/api/v1',
+    model: 'qwen/qwen-image-2.1-turbo',
+    supportsReferenceImage: true,
+    docsUrl: 'https://openrouter.ai/keys',
+  );
+
+  /// OpenRouter with Google Nano Banana 2.1.
+  static const AiProvider openRouterNanoBanana = AiProvider(
+    id: 'openrouter-nano-banana-2.1',
+    label: 'OpenRouter Nano Banana 2.1',
+    vendor: 'OpenRouter',
+    description: 'Latest Nano Banana generation through OpenRouter. Sends the '
+        'UV template as a reference image.',
+    kind: AiProviderKind.openRouterImages,
+    baseUrl: 'https://openrouter.ai/api/v1',
+    model: 'google/gemini-nano-banana-2.1',
+    supportsReferenceImage: true,
+    docsUrl: 'https://openrouter.ai/keys',
+  );
+
+  /// OpenRouter with Gemini 3 Pro Image, the highest quality option.
+  static const AiProvider openRouterGemini3Pro = AiProvider(
+    id: 'openrouter-gemini-3-pro-image',
+    label: 'OpenRouter Gemini 3 Pro Image',
+    vendor: 'OpenRouter',
+    description: 'Highest quality model on OpenRouter. Sends the UV template '
+        'as a reference image.',
+    kind: AiProviderKind.openRouterImages,
+    baseUrl: 'https://openrouter.ai/api/v1',
+    model: 'google/gemini-3-pro-image',
+    supportsReferenceImage: true,
+    docsUrl: 'https://openrouter.ai/keys',
+  );
+
   /// Every selectable provider, in menu order.
   static const List<AiProvider> all = [
     gemini3ProImage,
@@ -171,6 +234,10 @@ class AiProviderCatalog {
     gemini31FlashImage,
     openAiGptImage,
     openAiDallE3,
+    openRouterFluxKlein,
+    openRouterQwenTurbo,
+    openRouterNanoBanana,
+    openRouterGemini3Pro,
     customOpenAi,
   ];
 

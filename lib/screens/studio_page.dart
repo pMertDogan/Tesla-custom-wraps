@@ -110,6 +110,7 @@ class _StudioPageState extends State<StudioPage> {
         settings: state.settings,
         prompt: prompt,
         referenceImage: _templateBytes,
+        aspectRatio: widget.vehicle.aspectRatio,
       );
 
       final design = await _conform(result.bytes);
@@ -121,7 +122,10 @@ class _StudioPageState extends State<StudioPage> {
         _design = design;
         _mode = PreviewMode.design;
       });
-      _notify('Wrap generated with ${provider.label}.');
+      _notify(
+        'Wrap generated with ${provider.label}.'
+        '${result.cost == null ? '' : ' Cost: \$${result.cost!.toStringAsFixed(4)}'}',
+      );
     } on AiException catch (error) {
       _notify(error.message);
     } finally {

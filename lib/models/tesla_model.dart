@@ -57,6 +57,27 @@ class TeslaModel {
   /// Number of example designs Tesla ships for this vehicle.
   int get exampleCount => exampleNames.length;
 
+  /// Aspect ratio of the UV atlas, expressed the way image APIs want it
+  /// (for example `4:3`).
+  ///
+  /// Sending the real ratio keeps the generated artwork aligned with the
+  /// template, so the panel mask lands on the intended panels.
+  String get aspectRatio {
+    final divisor = _greatestCommonDivisor(templateWidth, templateHeight);
+    return '${templateWidth ~/ divisor}:${templateHeight ~/ divisor}';
+  }
+
+  static int _greatestCommonDivisor(int a, int b) {
+    var x = a;
+    var y = b;
+    while (y != 0) {
+      final t = y;
+      y = x % y;
+      x = t;
+    }
+    return x == 0 ? 1 : x;
+  }
+
   @override
   bool operator ==(Object other) =>
       identical(this, other) || (other is TeslaModel && other.id == id);

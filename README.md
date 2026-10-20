@@ -48,15 +48,44 @@ Open **Settings** from the home or the studio and pick a provider:
 | Gemini 3.1 Flash Image | `gemini-3.1-flash-image` | yes |
 | OpenAI gpt-image-1 | `gpt-image-1` | no |
 | OpenAI DALL-E 3 | `dall-e-3` | no |
+| OpenRouter FLUX 3 Klein | `black-forest-labs/flux-3-image-klein` | yes |
+| OpenRouter Qwen Image 2.1 Turbo | `qwen/qwen-image-2.1-turbo` | yes |
+| OpenRouter Nano Banana 2.1 | `google/gemini-nano-banana-2.1` | yes |
+| OpenRouter Gemini 3 Pro Image | `google/gemini-3-pro-image` | yes |
 | Custom OpenAI-compatible | your own | no |
 
-The Gemini models receive Tesla's UV template as a reference image, which is
-what keeps the artwork aligned with the real panels. OpenAI-compatible
-providers receive the layout described in text only.
+The Gemini and OpenRouter models receive Tesla's UV template as a reference
+image, which is what keeps the artwork aligned with the real panels.
+OpenAI-compatible providers receive the layout described in text only.
 
 The **Custom OpenAI-compatible** option points the studio at any gateway that
-speaks the OpenAI images API (LiteLLM, OpenRouter, a local proxy). Set the
-base URL and the model name in Settings.
+speaks the OpenAI images API (LiteLLM, a local proxy). Set the base URL and
+the model name in Settings.
+
+### OpenRouter
+
+OpenRouter is a first-class provider, not a "custom" one, because it speaks a
+different dialect: the studio posts to `POST https://openrouter.ai/api/v1/images`
+and hands the UV template over as an `input_references` entry, so the layout
+survives even for models that never see a text description of it. The template's
+own aspect ratio (`4:3`, `1:1`, …) is sent as `aspect_ratio`; if a model
+rejects that ratio the request is retried once without it and the exporter
+crops to the template.
+
+Get a key at <https://openrouter.ai/keys> and put it in the API key field.
+
+**OpenRouter has no free image models.** The `:free` tier covers text models
+only, so image generation always draws on the account balance. Prices are per
+image and start low:
+
+| Model | Price per image |
+| --- | --- |
+| `black-forest-labs/flux-3-image-klein` | about \$0.008 |
+| `qwen/qwen-image-2.1-turbo` | about \$0.018 |
+| `google/gemini-nano-banana-2.1` | about \$0.04 |
+| `google/gemini-3-pro-image` | about \$0.13 |
+
+A failed generation is not billed, so a rejected prompt costs nothing.
 
 The API key stays in memory for the session unless you tick *Remember this key
 on this device*.
@@ -78,6 +107,42 @@ template ┘   (wrap contract)     (image)       ├─► panel mask ─► exp
   inside a closed panel outline and therefore paintable.
 - **WrapExporter** crops the design to the template aspect, scales it, applies
   the mask and shrinks the PNG until it fits the 1 MB budget.
+
+## Command line
+
+The same pipeline runs headless, which is handy for checking a key or
+producing a wrap in a script:
+
+```bash
+# generate a wrap with a provider
+OPENROUTER_API_KEY=sk-or-... \
+  dart run tool/generate_wrap.dart \
+    --model model3-2024-base \
+    --provider openrouter-flux-3-image-klein \
+    --prompt "midnight blue carbon fibre with cyan racing stripes" \
+    --out build/wraps/
+
+# run an existing image through crop, mask and export (no credits spent)
+dart run tool/generate_wrap.dart \
+  --model model3-2024-base \
+  --from model3-2024-base/example/Sakura.png \
+  --name sakura_pipeline \
+  --out build/wraps/
+```
+
+| Option | Meaning |
+| --- | --- |
+| `--model` | Vehicle id, for example `model3-2024-base` |
+| `--provider` | Provider id, for example `openrouter-flux-3-image-klein` |
+| `--model-id` | Override the provider model |
+| `--base-url` | Override the provider base URL |
+| `--prompt` / `--style` | Design description and style preset |
+| `--from` | Process an existing image instead of generating one |
+| `--name` / `--out` | Output file name and directory |
+
+The key is read from `GEMINI_API_KEY`, `OPENAI_API_KEY` or
+`OPENROUTER_API_KEY`, depending on the provider. `WRAP_API_KEY` overrides all
+of them.
 
 ## Tesla's requirements
 

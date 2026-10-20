@@ -303,4 +303,183 @@ void main() {
       );
     });
   });
+
+  group('AiService with OpenRouter', () {
+    AiSettings openRouterSettings() =>
+        _settings(providerId: 'openrouter-flux-3-image-klein');
+
+    test('posts to the OpenRouter image endpoint with a bearer token',
+        () async {
+      late Uri sentUri;
+      late Map<String, dynamic> sentBody;
+      late String? sentAuth;
+
+      final service = AiService(
+        client: MockClient((request) async {
+          sentUri = request.url;
+          sentAuth = request.headers['Authorization'];
+          sentBody = jsonDecode(request.body) as Map<String, dynamic>;
+          return http.Response(
+            jsonEncode({
+              'data': [
+                {'b64_json': _tinyPngBase64, 'media_type': 'image/png'},
+              ],
+              'usage': {'cost': 0.008},
+            }),
+            200,
+          );
+        }),
+      );
+
+      final result = await service.generate(
+        provider: AiProviderCatalog.openRouterFluxKlein,
+        settings: openRouterSettings(),
+        prompt: 'red flames',
+        aspectRatio: '4:3',
+      );
+
+      expect(sentUri.toString(),
+          'https://openrouter.ai/api/v1/images');
+      expect(sentAuth, 'Bearer test-key');
+      expect(sentBody['model'], 'black-forest-labs/flux-3-image-klein');
+      expect(sentBody['prompt'], 'red flames');
+      expect(sentBody['n'], 1);
+      expect(sentBody.containsKey('output_format'), isFalse);
+      expect(sentBody['aspect_ratio'], '4:3');
+      expect(result.bytes, isNotEmpty);
+      expect(result.mimeType, 'image/png');
+      expect(result.cost, 0.008);
+    });
+
+    test('sends the template as an input reference', () async {
+      late Map<String, dynamic> sentBody;
+
+      final service = AiService(
+        client: MockClient((request) async {
+          sentBody = jsonDecode(request.body) as Map<String, dynamic>;
+          return http.Response(
+            jsonEncode({
+              'data': [
+                {'b64_json': _tinyPngBase64, 'media_type': 'image/png'},
+              ],
+            }),
+            200,
+          );
+        }),
+      );
+
+      await service.generate(
+        provider: AiProviderCatalog.openRouterFluxKlein,
+        settings: openRouterSettings(),
+        prompt: 'red flames',
+        referenceImage: Uint8List.fromList([1, 2, 3, 4]),
+      );
+
+      final references = sentBody['input_references'] as List;
+      expect(references, hasLength(1));
+
+      final reference = references.first as Map<String, dynamic>;
+      expect(reference['type'], 'image_url');
+
+      final imageUrl = (reference['image_url'] as Map<String, dynamic>)['url'];
+      expect(imageUrl, startsWith('data:image/png;base64,'));
+      expect(imageUrl, endsWith(base64Encode([1, 2, 3, 4])));
+    });
+
+    test('retries without the aspect ratio when the model rejects it',
+        () async {
+      var call = 0;
+      late Map<String, dynamic> lastBody;
+
+      final service = AiService(
+        client: MockClient((request) async {
+          call++;
+          lastBody = jsonDecode(request.body) as Map<String, dynamic>;
+          if (call == 1) {
+            return http.Response(
+              jsonEncode({
+                'error': {'message': 'aspect_ratio 7:5 is not supported'},
+              }),
+              400,
+            );
+          }
+          return http.Response(
+            jsonEncode({
+              'data': [
+                {'b64_json': _tinyPngBase64, 'media_type': 'image/png'},
+              ],
+            }),
+            200,
+          );
+        }),
+      );
+
+      final result = await service.generate(
+        provider: AiProviderCatalog.openRouterFluxKlein,
+        settings: openRouterSettings(),
+        prompt: 'red flames',
+        aspectRatio: '7:5',
+      );
+
+      expect(call, 2);
+      expect(lastBody.containsKey('aspect_ratio'), isFalse);
+      expect(result.bytes, isNotEmpty);
+    });
+
+    test('explains an exhausted OpenRouter credit balance', () async {
+      final service = AiService(
+        client: MockClient(
+          (_) async => http.Response(
+            jsonEncode({
+              'error': {'message': 'Insufficient credits'},
+            }),
+            402,
+          ),
+        ),
+      );
+
+      expect(
+        () => service.generate(
+          provider: AiProviderCatalog.openRouterFluxKlein,
+          settings: openRouterSettings(),
+          prompt: 'red flames',
+        ),
+        throwsA(
+          isA<AiException>().having(
+            (error) => error.message,
+            'message',
+            contains('credit'),
+          ),
+        ),
+      );
+    });
+
+    test('reports an unknown OpenRouter model', () async {
+      final service = AiService(
+        client: MockClient(
+          (_) async => http.Response(
+            jsonEncode({
+              'error': {'message': 'No model found for "nope"'},
+            }),
+            404,
+          ),
+        ),
+      );
+
+      expect(
+        () => service.generate(
+          provider: AiProviderCatalog.openRouterFluxKlein,
+          settings: openRouterSettings(),
+          prompt: 'red flames',
+        ),
+        throwsA(
+          isA<AiException>().having(
+            (error) => error.message,
+            'message',
+            contains('not found'),
+          ),
+        ),
+      );
+    });
+  });
 }
