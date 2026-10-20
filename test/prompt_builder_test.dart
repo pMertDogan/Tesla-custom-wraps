@@ -1,0 +1,97 @@
+import 'package:flutter_test/flutter_test.dart';
+import 'package:tesla_custom_wraps/services/prompt_builder.dart';
+
+void main() {
+  group('WrapPromptBuilder', () {
+    test('keeps the user concept in the prompt', () {
+      final prompt = WrapPromptBuilder.build(
+        concept: 'Midnight blue carbon fibre with cyan racing stripes',
+        vehicleName: 'Model Y',
+      );
+
+      expect(
+        prompt,
+        contains('Midnight blue carbon fibre with cyan racing stripes'),
+      );
+      expect(prompt, contains('Model Y'));
+    });
+
+    test('demands a flat texture instead of a car render', () {
+      final prompt = WrapPromptBuilder.build(
+        concept: 'red flames',
+        vehicleName: 'Cybertruck',
+      );
+
+      expect(prompt, contains('flat 2D texture sheet'));
+      expect(prompt, contains('Never draw the car itself'));
+      expect(prompt, contains('No text'));
+    });
+
+    test('asks the model to respect the attached UV atlas', () {
+      final prompt = WrapPromptBuilder.build(
+        concept: 'red flames',
+        vehicleName: 'Model 3',
+        hasReferenceTemplate: true,
+      );
+
+      expect(prompt, contains('reference image is the exact UV atlas'));
+      expect(prompt, contains('white (paintable) areas'));
+    });
+
+    test('describes the layout in text when there is no reference image', () {
+      final prompt = WrapPromptBuilder.build(
+        concept: 'red flames',
+        vehicleName: 'Model 3',
+        hasReferenceTemplate: false,
+      );
+
+      expect(prompt, contains('square texture atlas'));
+      expect(prompt, isNot(contains('reference image is the exact UV atlas')));
+    });
+
+    test('appends the selected style', () {
+      final prompt = WrapPromptBuilder.build(
+        concept: 'red flames',
+        vehicleName: 'Model 3',
+        style: WrapStyle.byId('camo').hint,
+      );
+
+      expect(prompt, contains('digital camouflage'));
+    });
+
+    test('falls back to an invented design when the prompt is empty', () {
+      final prompt = WrapPromptBuilder.build(
+        concept: '   ',
+        vehicleName: 'Model 3',
+      );
+
+      expect(prompt, contains('invent a striking wrap'));
+    });
+
+    test('collapses whitespace and clips long concepts', () {
+      final concept = List.filled(2000, 'flame').join(' ');
+
+      final prompt = WrapPromptBuilder.build(
+        concept: concept,
+        vehicleName: 'Model 3',
+      );
+
+      expect(
+        WrapPromptBuilder.sanitizeConcept(concept).length,
+        lessThanOrEqualTo(WrapPromptBuilder.maxConceptLength),
+      );
+      expect(prompt, isNot(contains('  ')));
+    });
+  });
+
+  group('WrapStyle', () {
+    test('every preset has a unique id', () {
+      final ids = WrapStyle.presets.map((style) => style.id).toSet();
+      expect(ids.length, WrapStyle.presets.length);
+    });
+
+    test('falls back to the first preset for an unknown id', () {
+      expect(WrapStyle.byId('does-not-exist').id, WrapStyle.presets.first.id);
+    });
+  });
+}

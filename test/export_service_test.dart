@@ -1,0 +1,215 @@
+import 'dart:math';
+import 'dart:typed_data';
+
+import 'package:flutter_test/flutter_test.dart';
+import 'package:image/image.dart' as img;
+import 'package:tesla_custom_wraps/services/export_service.dart';
+import 'package:tesla_custom_wraps/services/template_masker.dart';
+
+/// Builds a smooth PNG that compresses well.
+Uint8List _smoothPng(int width, int height) {
+  final image = img.Image(width: width, height: height);
+
+  for (var y = 0; y < height; y++) {
+    for (var x = 0; x < width; x++) {
+      image.setPixelRgba(
+        x,
+        y,
+        (x * 255) ~/ width,
+        (y * 255) ~/ height,
+        128,
+        255,
+      );
+    }
+  }
+
+  return img.encodePng(image, level: 6);
+}
+
+/// Builds a noisy PNG so the size budget has something to chew on.
+Uint8List _noisyPng(int width, int height) {
+  final image = img.Image(width: width, height: height);
+  final random = Random(7);
+
+  for (var y = 0; y < height; y++) {
+    for (var x = 0; x < width; x++) {
+      image.setPixelRgba(
+        x,
+        y,
+        random.nextInt(256),
+        random.nextInt(256),
+        random.nextInt(256),
+        255,
+      );
+    }
+  }
+
+  return img.encodePng(image, level: 6);
+}
+
+/// Builds a template-like image with a hollow black rectangle.
+Uint8List _templateWithPanel(int size) {
+  final image = img.Image(width: size, height: size);
+  img.fill(image, color: img.ColorRgb8(255, 255, 255));
+
+  final outer = size ~/ 4;
+  final inner = outer + 2;
+  final end = (size * 3) ~/ 4;
+
+  img.fillRect(
+    image,
+    x1: outer,
+    y1: outer,
+    x2: end,
+    y2: end,
+    color: img.ColorRgb8(0, 0, 0),
+  );
+  img.fillRect(
+    image,
+    x1: inner,
+    y1: inner,
+    x2: end - 2,
+    y2: end - 2,
+    color: img.ColorRgb8(255, 255, 255),
+  );
+
+  return img.encodePng(image);
+}
+
+void main() {
+  group('sanitizeFileName', () {
+    test('drops characters Tesla does not accept', () {
+      expect(
+        WrapExporter.sanitizeFileName('Red/Flam*es?v1'),
+        'RedFlamesv1',
+      );
+    });
+
+    test('keeps letters, digits, underscores, dashes and spaces', () {
+      expect(
+        WrapExporter.sanitizeFileName('My_Wrap-2026 v2'),
+        'My_Wrap-2026 v2',
+      );
+    });
+
+    test('clips the name to 30 characters', () {
+      final name = WrapExporter.sanitizeFileName('a' * 60);
+      expect(name.length, WrapExporter.maxFileNameLength);
+    });
+
+    test('collapses runs of whitespace and trims', () {
+      expect(WrapExporter.sanitizeFileName('  red   wrap  '), 'red wrap');
+    });
+
+    test('falls back to a default name when nothing is left', () {
+      expect(WrapExporter.sanitizeFileName('///'), 'tesla_wrap');
+    });
+
+    test('isValidFileName agrees with the sanitizer', () {
+      expect(WrapExporter.isValidFileName('Red_Wrap-01'), isTrue);
+      expect(WrapExporter.isValidFileName('Red/Wrap'), isFalse);
+      expect(WrapExporter.isValidFileName('a' * 31), isFalse);
+      expect(WrapExporter.isValidFileName(''), isFalse);
+    });
+  });
+
+  group('buildPng', () {
+    test('produces a PNG at the template size', () {
+      final wrap = WrapExporter.buildPng(
+        _smoothPng(1024, 1024),
+        templateWidth: 1024,
+        templateHeight: 1024,
+        fileName: 'my wrap',
+      );
+
+      expect(wrap.width, 1024);
+      expect(wrap.height, 1024);
+      expect(wrap.fileName, 'my wrap');
+      expect(wrap.bytes.length, lessThanOrEqualTo(WrapExporter.maxBytes));
+      expect(img.decodePng(wrap.bytes), isNotNull);
+    });
+
+    test('crops a square design to a 4:3 template', () {
+      final wrap = WrapExporter.buildPng(
+        _smoothPng(1024, 1024),
+        templateWidth: 1024,
+        templateHeight: 768,
+      );
+
+      expect(wrap.width, 1024);
+      expect(wrap.height, 768);
+    });
+
+    test('keeps the file under 1 MB even for a noisy design', () {
+      final wrap = WrapExporter.buildPng(
+        _noisyPng(1024, 1024),
+        templateWidth: 1024,
+        templateHeight: 1024,
+      );
+
+      expect(wrap.bytes.length, lessThanOrEqualTo(WrapExporter.maxBytes));
+      expect(wrap.downscaled, isTrue);
+    });
+
+    test('rejects an unreadable image', () {
+      expect(
+        () => WrapExporter.buildPng(
+          Uint8List.fromList([1, 2, 3]),
+          templateWidth: 1024,
+          templateHeight: 1024,
+        ),
+        throwsA(isA<ExportException>()),
+      );
+    });
+
+    test('clips the artwork to the panel mask', () {
+      final mask = TemplateMasker.buildMask(_templateWithPanel(64));
+      expect(mask, isNotNull);
+
+      final artwork = img.Image(width: 64, height: 64);
+      img.fill(artwork, color: img.ColorRgb8(255, 0, 0));
+
+      final wrap = WrapExporter.buildPng(
+        img.encodePng(artwork),
+        templateWidth: 64,
+        templateHeight: 64,
+        mask: mask,
+      );
+
+      final result = img.decodePng(wrap.bytes)!;
+      // Inside the panel the artwork survives.
+      expect(result.getPixel(32, 32).r, 255);
+      expect(result.getPixel(32, 32).g, 0);
+      // Outside the panel everything is white.
+      expect(result.getPixel(2, 2).r, 255);
+      expect(result.getPixel(2, 2).g, 255);
+      expect(result.getPixel(2, 2).b, 255);
+    });
+  });
+
+  group('coverCropToTemplate', () {
+    test('returns null for an unreadable image', () {
+      expect(
+        WrapExporter.coverCropToTemplate(
+          Uint8List.fromList([1, 2, 3]),
+          templateWidth: 64,
+          templateHeight: 64,
+        ),
+        isNull,
+      );
+    });
+
+    test('returns a PNG at the template size', () {
+      final result = WrapExporter.coverCropToTemplate(
+        _smoothPng(512, 512),
+        templateWidth: 256,
+        templateHeight: 256,
+      );
+
+      expect(result, isNotNull);
+      final decoded = img.decodePng(result!)!;
+      expect(decoded.width, 256);
+      expect(decoded.height, 256);
+    });
+  });
+}

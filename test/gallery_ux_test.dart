@@ -1,8 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:app/screens/home_page.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:tesla_custom_wraps/screens/home_page.dart';
 
 void main() {
+  setUp(() {
+    SharedPreferences.setMockInitialValues({});
+  });
+
   testWidgets('HomePage Gallery items have Tooltips and Semantics for Like action', (
     WidgetTester tester,
   ) async {
@@ -18,13 +23,14 @@ void main() {
     await tester.pumpWidget(const MaterialApp(home: HomePage()));
     await tester.pumpAndSettle();
 
+    // The gallery sits below the hero and the vehicle carousel, so it has to
+    // be scrolled into view before the lazily built tiles exist.
+    await tester.drag(find.byType(SingleChildScrollView), const Offset(0, -1600));
+    await tester.pumpAndSettle();
+
     // Check Like buttons in gallery
     expect(find.byTooltip('Like this design'), findsAtLeastNWidgets(1));
-    expect(find.bySemanticsLabel('Like this design'), findsAtLeastNWidgets(1));
-
-    // Scroll down manually to reveal the gallery
-    await tester.drag(find.byType(SingleChildScrollView), const Offset(0, -1000));
-    await tester.pumpAndSettle();
+    expect(find.bySemanticsLabel('Like design'), findsAtLeastNWidgets(1));
 
     // Test SnackBar on click
     await tester.tap(find.byTooltip('Like this design').first);

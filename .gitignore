@@ -8,3 +8,20 @@
 .pub-cache/
 .pub/
 build/
+
+# IDE
+.idea/
+*.iml
+*.ipr
+*.iws
+
+# Flutter tool generated
+.flutter-plugins
+.flutter-plugins-dependencies
+
+# Logs & local artifacts
+*.log
+final_*.png
+
+# OS
+Thumbs.db

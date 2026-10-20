@@ -1,5 +1,7 @@
-name: app
-description: "A new Flutter project."
+name: tesla_custom_wraps
+description: >-
+  AI-powered Tesla custom wrap designer. Describe a wrap, generate it with a
+  text-to-image model, and export it in Tesla's Paint Shop format.
 publish_to: 'none'
 version: 1.0.0+1
 
@@ -10,7 +12,11 @@ dependencies:
   flutter:
     sdk: flutter
   cupertino_icons: ^1.0.8
+  file_saver: ^0.7.0
+  http: ^1.2.2
+  image: ^4.2.0
   model_viewer_plus: ^1.10.0
+  shared_preferences: ^2.3.2
 
 dev_dependencies:
   flutter_test:
@@ -20,23 +26,35 @@ dev_dependencies:
 flutter:
   uses-material-design: true
   assets:
-    - assets/images/
+    # App-specific 3D vehicle models (GLB).
     - assets/models/
-    - assets/cybertruck/
-    - assets/cybertruck/example/
-    - assets/model3/
-    - assets/model3/example/
-    - assets/model3-2024-base/
-    - assets/model3-2024-base/example/
-    - assets/model3-2024-performance/
-    - assets/model3-2024-performance/example/
-    - assets/modely/
-    - assets/modely/example/
-    - assets/modely-2025-base/
-    - assets/modely-2025-base/example/
-    - assets/modely-2025-performance/
-    - assets/modely-2025-performance/example/
-    - assets/modely-2025-premium/
-    - assets/modely-2025-premium/example/
-    - assets/modely-l/
-    - assets/modely-l/example/
+
+    # Official Tesla wrap templates and example designs.
+    # Layout mirrors teslamotors/custom-wraps: <model>/template.png is the
+    # paintable UV atlas, <model>/vehicle_image.png is the reference render
+    # and <model>/example/*.png are Tesla's own example wraps.
+    - images/
+    - cybertruck/
+    - cybertruck/example/
+    - model3/
+    - model3/example/
+    - model3-2024-base/
+    - model3-2024-base/example/
+    - model3-2024-performance/
+    - model3-2024-performance/example/
+    - models-2021/
+    - models-2021/example/
+    - models-2025-plaid/
+    - models-2025-plaid/example/
+    - modelx-2021/
+    - modelx-2021/example/
+    - modely/
+    - modely/example/
+    - modely-2025-base/
+    - modely-2025-base/example/
+    - modely-2025-performance/
+    - modely-2025-performance/example/
+    - modely-2025-premium/
+    - modely-2025-premium/example/
+    - modely-l/
+    - modely-l/example/

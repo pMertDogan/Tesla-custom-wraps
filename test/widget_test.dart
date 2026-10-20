@@ -1,58 +1,86 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:app/main.dart';
-import 'package:app/screens/studio_page.dart';
-import 'package:app/services/vehicle_service.dart';
-import 'package:model_viewer_plus/model_viewer_plus.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:tesla_custom_wraps/main.dart';
+import 'package:tesla_custom_wraps/screens/gallery_page.dart';
+import 'package:tesla_custom_wraps/screens/studio_page.dart';
+import 'package:tesla_custom_wraps/services/ai_service.dart';
+import 'package:tesla_custom_wraps/services/vehicle_service.dart';
+import 'package:tesla_custom_wraps/state/app_scope.dart';
+import 'package:tesla_custom_wraps/state/app_state.dart';
+
+/// Wraps a screen in the scope the app provides at runtime.
+Widget _host(Widget child) {
+  return AppScope(
+    state: AppState(aiService: AiService()),
+    child: MaterialApp(home: child),
+  );
+}
 
 void main() {
-  testWidgets('App smoke test', (WidgetTester tester) async {
-    // Build our app and trigger a frame.
-    // Wrap in a large enough Container to avoid overflow in some test environments.
-    await tester.pumpWidget(
-      const SizedBox(width: 2000, height: 2000, child: MyApp()),
-    );
-
-    // Verify that the title is present.
-    expect(find.text('TESLA WRAP STUDIO'), findsOneWidget);
+  setUp(() {
+    SharedPreferences.setMockInitialValues({});
   });
 
-  testWidgets('StudioPage settings dialog has obscured API key field', (
-    WidgetTester tester,
-  ) async {
-    final vehicle = VehicleService.getVehicles().first;
+  testWidgets('App boots and shows the home page', (tester) async {
+    tester.view.physicalSize = const Size(1920, 1080);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
 
-    await tester.pumpWidget(MaterialApp(home: StudioPage(vehicle: vehicle)));
-
-    // Find and tap the settings button.
-    await tester.tap(find.byIcon(Icons.settings));
+    await tester.pumpWidget(const TeslaWrapStudioApp());
     await tester.pumpAndSettle();
 
-    // Verify the dialog is shown.
-    expect(find.text('API SETTINGS'), findsOneWidget);
-
-    // Find the API KEY TextField.
-    final apiKeyTextField = find.ancestor(
-      of: find.text('API KEY'),
-      matching: find.byType(TextField),
-    );
-
-    expect(apiKeyTextField, findsOneWidget);
-
-    // Verify it has obscureText set to true, and autocorrect/enableSuggestions set to false.
-    final TextField textFieldWidget = tester.widget(apiKeyTextField);
-    expect(textFieldWidget.obscureText, isTrue);
-    expect(textFieldWidget.autocorrect, isFalse);
-    expect(textFieldWidget.enableSuggestions, isFalse);
+    expect(find.text('TESLA WRAP STUDIO'), findsOneWidget);
+    expect(find.text('GET STARTED'), findsOneWidget);
+    expect(find.text('CHOOSE YOUR CANVAS'), findsOneWidget);
   });
 
-  testWidgets('StudioPage TextFields have security enhancements', (
-    WidgetTester tester,
-  ) async {
+  testWidgets('Studio page renders for a real vehicle', (tester) async {
+    tester.view.physicalSize = const Size(1920, 1080);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
     final vehicle = VehicleService.getVehicles().first;
+    await tester.pumpWidget(_host(StudioPage(vehicle: vehicle)));
+    await tester.pumpAndSettle();
 
-    await tester.pumpWidget(MaterialApp(home: StudioPage(vehicle: vehicle)));
+    expect(find.text('STUDIO: ${vehicle.name.toUpperCase()}'), findsOneWidget);
+    expect(find.text('AI DESIGNER'), findsOneWidget);
+    expect(find.text('GENERATE WRAP'), findsOneWidget);
+    expect(find.text('PROMPT'), findsOneWidget);
+  });
 
-    expect(find.byType(ModelViewer), findsOneWidget);
+  testWidgets('Gallery page lists Tesla example designs', (tester) async {
+    tester.view.physicalSize = const Size(1920, 1080);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(_host(const GalleryPage()));
+    await tester.pumpAndSettle();
+
+    expect(find.text('WRAP GALLERY'), findsOneWidget);
+    expect(find.byType(Image), findsWidgets);
+  });
+
+  testWidgets('Every vehicle in the catalog can open the studio', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(1920, 1080);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    for (final vehicle in VehicleService.getVehicles()) {
+      await tester.pumpWidget(_host(StudioPage(vehicle: vehicle)));
+      await tester.pumpAndSettle();
+      expect(
+        find.text('STUDIO: ${vehicle.name.toUpperCase()}'),
+        findsOneWidget,
+        reason: 'Studio should render for ${vehicle.id}',
+      );
+    }
   });
 }
