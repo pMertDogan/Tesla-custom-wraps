@@ -44,6 +44,7 @@ Open **Settings** from the home or the studio and pick a provider:
 | --- | --- | --- | --- |
 | Cloudflare FLUX 2 dev | `@cf/black-forest-labs/flux-2-dev` | yes | free daily allowance |
 | Cloudflare FLUX 2 Klein 9B | `@cf/black-forest-labs/flux-2-klein-9b` | yes | free daily allowance |
+| Cloudflare FLUX 2 Klein 4B | `@cf/black-forest-labs/flux-2-klein-4b` | yes | free daily allowance |
 | Cloudflare FLUX 1 schnell | `@cf/black-forest-labs/flux-1-schnell` | no | free daily allowance |
 | Gemini 3 Pro Image | `gemini-3-pro-image` | yes | paid |
 | Gemini Nano Banana 2.1 | `gemini-nano-banana-2.1` | yes | paid |
@@ -77,18 +78,40 @@ Create a token at <https://dash.cloudflare.com/profile/api-tokens> with the
 - **API key**: the token
 - **Base URL**: `https://api.cloudflare.com/client/v4/accounts/<account id>/ai/run`
   (the account id is in the Cloudflare dashboard sidebar)
-- **Model**: `@cf/black-forest-labs/flux-2-dev`
+- **Model**: `@cf/black-forest-labs/flux-2-klein-4b` for the most wraps a day,
+  or `@cf/black-forest-labs/flux-2-dev` for the strongest one
 
-How many wraps a day that buys:
+How many wraps a day that buys, at the 1024x1024 tier the studio asks for:
 
-| Model | Neurons per image | Images per day |
-| --- | --- | --- |
-| `@cf/black-forest-labs/flux-2-dev` | about 900 | about 11 |
-| `@cf/black-forest-labs/flux-2-klein-9b` | about 1,500 | about 6 |
-| `@cf/black-forest-labs/flux-1-schnell` | about 173 | about 57 (text only) |
+| Model | Neurons per image | Images per day | Reference image |
+| --- | --- | --- | --- |
+| `@cf/black-forest-labs/flux-2-klein-4b` | about 130 | about 75 | yes |
+| `@cf/black-forest-labs/flux-1-schnell` | about 58 | about 170 | no, text only |
+| `@cf/black-forest-labs/flux-2-dev` | about 900 | about 11 | yes |
+| `@cf/black-forest-labs/flux-2-klein-9b` | about 1,545 | about 6 | yes |
 
-The studio shows the neuron count of every generation, and the allowance
-resets daily. A rejected request never consumes neurons.
+The allowance is 10,000 neurons **for the whole account, shared by every
+model**, and it resets at 00:00 UTC. The studio shows the neuron count of
+every generation, so the real cost is always visible. A rejected request
+never consumes neurons.
+
+Cloudflare bills the same neurons after the free allowance runs out, at
+\$0.011 per 1,000 neurons, which is about \$0.01 for another FLUX 2 dev
+wrap. The **Workers Paid** plan starts at \$5 a month and still includes
+the same 10,000 free neurons a day.
+
+#### Request body shapes
+
+Workers AI models do not agree on how a request looks, and the studio sends
+what each one wants:
+
+- The **FLUX 2** models only accept a multipart form, where the UV template
+  travels as a file and the prompt as a field. They are picky about the
+  optional fields, so the studio falls back from the full body to a shorter
+  one and finally to a prompt-only body.
+- **FLUX 1 schnell** only accepts JSON, and it wants the step count as an
+  integer. A string is rejected, and so are `num_steps`, `seed`, `width` and
+  `height`.
 
 #### Cloudflare in the browser build
 

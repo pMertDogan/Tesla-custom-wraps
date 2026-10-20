@@ -21,6 +21,19 @@ enum AiProviderKind {
   cloudflareWorkersAi,
 }
 
+/// How the request body has to be encoded for a provider.
+///
+/// Workers AI is not consistent about this: the FLUX 2 models only accept a
+/// multipart form, while FLUX 1 schnell only accepts JSON and rejects a
+/// multipart body outright.
+enum AiBodyFormat {
+  /// A JSON object.
+  json,
+
+  /// A multipart form with the reference image as a file part.
+  multipart,
+}
+
 /// A text-to-image provider the studio can talk to.
 class AiProvider {
   /// Stable key persisted in settings.
@@ -49,6 +62,12 @@ class AiProvider {
   /// receive the layout described in text only.
   final bool supportsReferenceImage;
 
+  /// How the request body is encoded.
+  ///
+  /// Only Workers AI cares: its FLUX 2 models want a multipart form, its
+  /// FLUX 1 models want JSON. Everything else speaks JSON.
+  final AiBodyFormat bodyFormat;
+
   /// Where users can obtain an API key.
   final String? docsUrl;
 
@@ -61,6 +80,7 @@ class AiProvider {
     required this.baseUrl,
     required this.model,
     required this.supportsReferenceImage,
+    this.bodyFormat = AiBodyFormat.json,
     this.docsUrl,
   });
 
@@ -247,6 +267,7 @@ class AiProviderCatalog {
     openRouterGemini3Pro,
     cloudflareFlux2Dev,
     cloudflareFlux2Klein,
+    cloudflareFlux2Klein4b,
     cloudflareFlux1Schnell,
     customOpenAi,
   ];
@@ -264,6 +285,7 @@ class AiProviderCatalog {
         'YOUR_ACCOUNT_ID/ai/run',
     model: '@cf/black-forest-labs/flux-2-dev',
     supportsReferenceImage: true,
+    bodyFormat: AiBodyFormat.multipart,
     docsUrl: 'https://dash.cloudflare.com/profile/api-tokens',
   );
 
@@ -272,7 +294,7 @@ class AiProviderCatalog {
     id: 'cloudflare-flux-2-klein-9b',
     label: 'Cloudflare FLUX 2 Klein 9B',
     vendor: 'Cloudflare',
-    description: 'Free on the Cloudflare daily allowance (about 1,500 '
+    description: 'Free on the Cloudflare daily allowance (about 1,545 '
         'neurons per image, roughly 6 images a day). Sends the UV template '
         'as a reference image.',
     kind: AiProviderKind.cloudflareWorkersAi,
@@ -280,19 +302,42 @@ class AiProviderCatalog {
         'YOUR_ACCOUNT_ID/ai/run',
     model: '@cf/black-forest-labs/flux-2-klein-9b',
     supportsReferenceImage: true,
+    bodyFormat: AiBodyFormat.multipart,
+    docsUrl: 'https://dash.cloudflare.com/profile/api-tokens',
+  );
+
+  /// Cloudflare Workers AI with FLUX 2 Klein 4B.
+  ///
+  /// The distilled 4B sibling of the 9B model: it still takes the UV
+  /// template as a reference image, but it costs a fraction of the neurons,
+  /// so the daily allowance buys far more wraps.
+  static const AiProvider cloudflareFlux2Klein4b = AiProvider(
+    id: 'cloudflare-flux-2-klein-4b',
+    label: 'Cloudflare FLUX 2 Klein 4B',
+    vendor: 'Cloudflare',
+    description: 'Free on the Cloudflare daily allowance (about 130 neurons '
+        'per image, roughly 75 images a day). Sends the UV template as a '
+        'reference image.',
+    kind: AiProviderKind.cloudflareWorkersAi,
+    baseUrl: 'https://api.cloudflare.com/client/v4/accounts/'
+        'YOUR_ACCOUNT_ID/ai/run',
+    model: '@cf/black-forest-labs/flux-2-klein-4b',
+    supportsReferenceImage: true,
+    bodyFormat: AiBodyFormat.multipart,
     docsUrl: 'https://dash.cloudflare.com/profile/api-tokens',
   );
 
   /// Cloudflare Workers AI with FLUX 1 schnell, the cheapest of all.
   ///
   /// This one is text only, so the studio has to describe the layout
-  /// instead of showing the template.
+  /// instead of showing the template. It also wants a JSON body, unlike the
+  /// FLUX 2 models.
   static const AiProvider cloudflareFlux1Schnell = AiProvider(
     id: 'cloudflare-flux-1-schnell',
     label: 'Cloudflare FLUX 1 schnell',
     vendor: 'Cloudflare',
-    description: 'Cheapest option anywhere (about 173 neurons per image, '
-        'roughly 57 images a day) but text only, so the layout is described '
+    description: 'Cheapest option anywhere (about 58 neurons per image, '
+        'roughly 170 images a day) but text only, so the layout is described '
         'instead of shown.',
     kind: AiProviderKind.cloudflareWorkersAi,
     baseUrl: 'https://api.cloudflare.com/client/v4/accounts/'

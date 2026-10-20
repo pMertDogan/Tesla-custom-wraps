@@ -570,6 +570,121 @@ void main() {
       expect(result.units, '900.0');
     });
 
+    test('posts JSON with an integer step count for FLUX 1 schnell', () async {
+      late Uri sentUri;
+      late Map<String, dynamic> sentBody;
+      late String? sentContentType;
+      late bool wasMultipart = true;
+
+      final client = MockClient((request) async {
+        wasMultipart = request is http.MultipartRequest;
+        sentUri = request.url;
+        sentContentType = request.headers['Content-Type'];
+        sentBody = jsonDecode(request.body) as Map<String, dynamic>;
+        return http.Response(
+          jsonEncode({
+            'result': {
+              'image': _tinyPngBase64,
+              'usage': {'neurons': 57.6},
+            },
+            'success': true,
+          }),
+          200,
+        );
+      });
+
+      final service = AiService(client: client);
+      final result = await service.generate(
+        provider: AiProviderCatalog.cloudflareFlux1Schnell,
+        settings: _settings(
+          providerId: 'cloudflare-flux-1-schnell',
+          baseUrl: baseUrl,
+        ),
+        prompt: 'red flames',
+      );
+
+      expect(wasMultipart, isFalse);
+      expect(sentContentType, contains('application/json'));
+      expect(sentUri.toString(),
+          '$baseUrl/@cf/black-forest-labs/flux-1-schnell');
+      expect(sentBody['prompt'], 'red flames');
+      // The model insists on an integer, a string is rejected outright.
+      expect(sentBody['steps'], isA<int>());
+      expect(sentBody['steps'], 4);
+      expect(result.units, '57.6');
+    });
+
+    test('drops the step count when the model rejects the body', () async {
+      final bodies = <Map<String, dynamic>>[];
+
+      final client = MockClient((request) async {
+        final body = jsonDecode(request.body) as Map<String, dynamic>;
+        bodies.add(body);
+        if (bodies.length == 1) {
+          return http.Response(
+            jsonEncode({
+              'errors': [
+                {
+                  'code': 5006,
+                  'message': "Type mismatch of '/steps', 'integer' not in "
+                      "'string'",
+                },
+              ],
+            }),
+            400,
+          );
+        }
+        return http.Response(
+          jsonEncode({
+            'result': {
+              'image': _tinyPngBase64,
+              'usage': {'neurons': 172.8},
+            },
+            'success': true,
+          }),
+          200,
+        );
+      });
+
+      final service = AiService(client: client);
+      final result = await service.generate(
+        provider: AiProviderCatalog.cloudflareFlux1Schnell,
+        settings: _settings(
+          providerId: 'cloudflare-flux-1-schnell',
+          baseUrl: baseUrl,
+        ),
+        prompt: 'red flames',
+      );
+
+      expect(bodies, hasLength(2));
+      expect(bodies.first.containsKey('steps'), isTrue);
+      expect(bodies.last.containsKey('steps'), isFalse);
+      expect(result.units, '172.8');
+    });
+
+    test('offers a cheap FLUX 2 Klein 4B that takes the template', () {
+      final klein = AiProviderCatalog.cloudflareFlux2Klein4b;
+
+      expect(klein.model, '@cf/black-forest-labs/flux-2-klein-4b');
+      expect(klein.supportsReferenceImage, isTrue);
+      expect(klein.bodyFormat, AiBodyFormat.multipart);
+      expect(
+        AiProviderCatalog.all.map((provider) => provider.id),
+        contains(klein.id),
+      );
+    });
+
+    test('keeps FLUX 1 schnell on a JSON body', () {
+      expect(
+        AiProviderCatalog.cloudflareFlux1Schnell.bodyFormat,
+        AiBodyFormat.json,
+      );
+      expect(
+        AiProviderCatalog.cloudflareFlux2Dev.bodyFormat,
+        AiBodyFormat.multipart,
+      );
+    });
+
     test('explains that the daily free allowance is used up', () async {
       final service = AiService(
         client: MockClient(

@@ -324,9 +324,13 @@ class AiService {
   /// Cloudflare grants every account a free daily neuron allowance, which
   /// makes it the only provider here that can produce a wrap without
   /// paying. The endpoint is
-  /// `POST /accounts/{account id}/ai/run/{model}` and it expects a
-  /// multipart form: the UV template travels as a file, the prompt as a
-  /// field.
+  /// `POST /accounts/{account id}/ai/run/{model}`.
+  ///
+  /// Workers AI is not consistent about the request body. The FLUX 2 models
+  /// only accept a multipart form, where the UV template travels as a file
+  /// and the prompt as a field. FLUX 1 schnell only accepts JSON and even
+  /// insists on a typed `steps` count, so the body format follows the
+  /// provider.
   Future<GeneratedImage> _generateWithCloudflare({
     required AiProvider provider,
     required AiSettings settings,
@@ -350,39 +354,18 @@ class AiService {
 
     final uri = Uri.parse('${_stripTrailingSlash(baseUrl)}/$model');
 
-    // Workers AI models disagree on which optional fields they accept, so
-    // the request is retried with a smaller body until one is understood.
-    // A rejected request never consumes neurons.
-    final attempts = <Map<String, String>>[
-      {
-        'prompt': prompt,
-        'num_steps': '4',
-        if (width != null) 'width': '$width',
-        if (height != null) 'height': '$height',
-        'seed': '${DateTime.now().millisecondsSinceEpoch % 100000}',
-      },
-      {
-        'prompt': prompt,
-        'steps': '4',
-      },
-      {
-        'prompt': prompt,
-      },
-    ];
-
-    http.Response? lastResponse;
-    for (final fields in attempts) {
-      lastResponse = await _postCloudflare(
-        uri,
-        apiKey,
-        fields,
-        referenceImage: referenceImage,
-        referenceMimeType: referenceMimeType,
-        provider: provider,
-      );
-      if (lastResponse.statusCode != 400) break;
-    }
-    final response = lastResponse!;
+    final response = provider.bodyFormat == AiBodyFormat.json
+        ? await _postCloudflareJson(uri, apiKey, prompt, provider: provider)
+        : await _postCloudflareMultipart(
+            uri,
+            apiKey,
+            prompt,
+            referenceImage: referenceImage,
+            referenceMimeType: referenceMimeType,
+            width: width,
+            height: height,
+            provider: provider,
+          );
 
     final decoded = _decodeBody(response.body);
 
@@ -422,29 +405,122 @@ class AiService {
     throw const AiException('Cloudflare did not return an image.');
   }
 
-  Future<http.Response> _postCloudflare(
+  /// Posts a JSON body to a Workers AI model.
+  ///
+  /// FLUX 1 schnell takes `prompt` and an integer `steps`, and nothing else:
+  /// `num_steps`, `seed`, `width` and `height` are all rejected. A rejected
+  /// request never spends neurons, so the call can be retried with fewer
+  /// fields.
+  Future<http.Response> _postCloudflareJson(
     Uri uri,
     String apiKey,
-    Map<String, String> fields, {
+    String prompt, {
+    required AiProvider provider,
+  }) async {
+    final attempts = <Map<String, dynamic>>[
+      {'prompt': prompt, 'steps': 4},
+      {'prompt': prompt},
+    ];
+
+    http.Response? lastResponse;
+    for (final body in attempts) {
+      lastResponse = await _postCloudflare(
+        uri,
+        apiKey,
+        body: body,
+        provider: provider,
+      );
+      if (lastResponse.statusCode != 400) break;
+    }
+    return lastResponse!;
+  }
+
+  /// Posts a multipart form to a Workers AI model.
+  ///
+  /// The FLUX 2 models disagree on which optional fields they accept, so the
+  /// request is retried with a smaller body until one is understood. A
+  /// rejected request never consumes neurons.
+  Future<http.Response> _postCloudflareMultipart(
+    Uri uri,
+    String apiKey,
+    String prompt, {
+    Uint8List? referenceImage,
+    String referenceMimeType = 'image/png',
+    int? width,
+    int? height,
+    required AiProvider provider,
+  }) async {
+    final attempts = <Map<String, String>>[
+      {
+        'prompt': prompt,
+        'num_steps': '4',
+        if (width != null) 'width': '$width',
+        if (height != null) 'height': '$height',
+        'seed': '${DateTime.now().millisecondsSinceEpoch % 100000}',
+      },
+      {
+        'prompt': prompt,
+        'steps': '4',
+      },
+      {
+        'prompt': prompt,
+      },
+    ];
+
+    http.Response? lastResponse;
+    for (final fields in attempts) {
+      lastResponse = await _postCloudflare(
+        uri,
+        apiKey,
+        fields: fields,
+        referenceImage: referenceImage,
+        referenceMimeType: referenceMimeType,
+        provider: provider,
+      );
+      if (lastResponse.statusCode != 400) break;
+    }
+    return lastResponse!;
+  }
+
+  /// Sends one request to a Workers AI model.
+  ///
+  /// Pass [fields] for a multipart form or [body] for JSON, never both.
+  Future<http.Response> _postCloudflare(
+    Uri uri,
+    String apiKey, {
+    Map<String, String>? fields,
+    Map<String, dynamic>? body,
     Uint8List? referenceImage,
     String referenceMimeType = 'image/png',
     required AiProvider provider,
   }) async {
     try {
-      final request = http.MultipartRequest('POST', uri);
-      request.headers['Authorization'] = 'Bearer $apiKey';
-      fields.forEach((key, value) => request.fields[key] = value);
-
-      if (referenceImage != null) {
-        request.files.add(
-          http.MultipartFile.fromBytes(
-            'image',
-            referenceImage,
-            filename: 'template.png',
-            contentType: MediaType.parse(referenceMimeType),
-          ),
+      final http.BaseRequest request;
+      if (body != null) {
+        final jsonRequest = http.Request('POST', uri)
+          ..headers['Content-Type'] = 'application/json'
+          ..body = jsonEncode(body);
+        request = jsonRequest;
+      } else {
+        final multipartRequest = http.MultipartRequest('POST', uri);
+        (fields ?? const <String, String>{}).forEach(
+          (key, value) => multipartRequest.fields[key] = value,
         );
+
+        if (referenceImage != null) {
+          multipartRequest.files.add(
+            http.MultipartFile.fromBytes(
+              'image',
+              referenceImage,
+              filename: 'template.png',
+              contentType: MediaType.parse(referenceMimeType),
+            ),
+          );
+        }
+        request = multipartRequest;
       }
+
+      request.headers['Authorization'] = 'Bearer $apiKey';
 
       // The request has to go through the injected client: `Request.send()`
       // would open its own connection and ignore the timeout.
@@ -748,6 +824,15 @@ class AiService {
     }
     if (lower.contains('not allowed') || lower.contains('unevaluated')) {
       return '${provider.label} rejected the request shape for model '
+          '"${model ?? provider.model}". Try another model.';
+    }
+    if (lower.contains('not valid json') ||
+        lower.contains('required properties')) {
+      return '${provider.label} expects a different request body for model '
+          '"${model ?? provider.model}". Try another model.';
+    }
+    if (lower.contains('type mismatch')) {
+      return '${provider.label} rejected a field type for model '
           '"${model ?? provider.model}". Try another model.';
     }
     if (providerMessage != null && providerMessage.trim().isNotEmpty) {
