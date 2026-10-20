@@ -17,12 +17,19 @@ class WrapPromptBuilder {
   /// [style] is an optional style hint (see [WrapStyle.presets]).
   /// [hasReferenceTemplate] is true when the model's UV template is attached
   /// to the request as a reference image.
+  /// [flatPatternOnly] switches to the short pattern prompt used by
+  /// providers that ignore the reference image and only read the prompt.
   static String build({
     required String concept,
     required String vehicleName,
     String? style,
     bool hasReferenceTemplate = true,
+    bool flatPatternOnly = false,
   }) {
+    if (flatPatternOnly) {
+      return buildPattern(concept: concept, style: style);
+    }
+
     final cleaned = sanitizeConcept(concept);
     final styleHint = (style == null || style.trim().isEmpty)
         ? WrapStyle.defaultStyleHint
@@ -93,6 +100,96 @@ class WrapPromptBuilder {
       );
 
     return buffer.toString();
+  }
+
+  /// Builds the short prompt used by providers that ignore the reference
+  /// image and only read the prompt.
+  ///
+  /// These providers are told to draw a flat pattern rather than a vehicle,
+  /// and the studio's panel mask clips that pattern onto the real body
+  /// panels afterwards. The wording is deliberately compact: some of these
+  /// services carry the prompt in the URL, where every character counts.
+  ///
+  /// The wording is positive on purpose. Naming a vehicle, even to rule it
+  /// out, is enough to make an image model render one, and a wrap that shows
+  /// a photo of a car instead of a pattern is worthless. The prompt therefore
+  /// describes what the frame should hold and stays silent about cars.
+  static String buildPattern({
+    required String concept,
+    String? style,
+  }) {
+    final cleaned = sanitizePatternConcept(sanitizeConcept(concept));
+    final styleHint = (style == null || style.trim().isEmpty)
+        ? WrapStyle.defaultStyleHint
+        : style.trim();
+
+    final buffer = StringBuffer()
+      ..writeln('Full bleed seamless abstract texture pattern, edge to edge.')
+      ..writeln()
+      ..writeln('CONCEPT')
+      ..writeln(cleaned.isEmpty ? 'invent a striking texture pattern' : cleaned)
+      ..writeln()
+      ..writeln('STYLE')
+      ..writeln(styleHint)
+      ..writeln()
+      ..writeln(
+        'One flat printed surface, pure pattern, nothing else in the frame.',
+      )
+      ..writeln(
+        'Seamless and tileable, evenly lit, high contrast, clean edges, poster '
+        'quality.',
+      );
+
+    return buffer.toString();
+  }
+
+  /// Words that send the model straight back to drawing the car.
+  ///
+  /// A provider that only reads the prompt gets a template as a colour cue
+  /// but no layout, so mentioning the vehicle in the concept makes it render
+  /// a photo of that vehicle instead of the wrap pattern. The vehicle is
+  /// irrelevant for a flat pattern, the panel mask places it on the car.
+  static const List<String> _vehicleWords = [
+    'cybertruck',
+    'cyber truck',
+    'model 3',
+    'model3',
+    'model s',
+    'model x',
+    'model y',
+    'model l',
+    'models',
+    'modely',
+    'modelx',
+    'modell',
+    'tesla',
+    'car',
+    'vehicle',
+    'automobile',
+    'jeep',
+    'van',
+    'truck',
+    'sedan',
+    'suv',
+    'coupe',
+    'hatchback',
+  ];
+
+  /// Strips the vehicle out of a concept for providers that draw a flat
+  /// pattern.
+  ///
+  /// The words are removed as whole words, so a design called "Model of
+  /// behaviour" keeps its meaning while "a red cybertruck wrap" becomes "a
+  /// red wrap".
+  static String sanitizePatternConcept(String concept) {
+    var result = concept;
+    for (final word in _vehicleWords) {
+      result = result.replaceAll(
+        RegExp('\\b${RegExp.escape(word)}\\b', caseSensitive: false),
+        ' ',
+      );
+    }
+    return result.replaceAll(RegExp(r'\s+'), ' ').trim();
   }
 
   /// Normalises the raw user input: trims, collapses whitespace and clips

@@ -42,11 +42,14 @@ Future<void> main(List<String> arguments) async {
     return;
   }
 
+  final provider = AiProviderCatalog.byId(options['provider'] ?? 'gemini-3-pro-image');
+
   final prompt = WrapPromptBuilder.build(
     concept: options['prompt'] ?? 'a striking wrap',
     vehicleName: vehicle.name,
     style: WrapStyle.byId(options['style'] ?? 'vector').hint,
     hasReferenceTemplate: true,
+    flatPatternOnly: !provider.followsReferenceLayout,
   );
 
   final templateBytes = File(vehicle.templatePath).readAsBytesSync();
@@ -64,11 +67,10 @@ Future<void> main(List<String> arguments) async {
     return;
   }
 
-  final provider = AiProviderCatalog.byId(options['provider'] ?? 'gemini-3-pro-image');
   final apiKey = _resolveApiKey(provider);
-  if (apiKey == null) {
+  if (provider.requiresApiKey && apiKey == null) {
     stderr.writeln(
-      'No API key found. Set ${_apiKeyEnvName(provider)}.',
+      'No API key found. Set ${_apiKeyEnvName(provider) ?? 'WRAP_API_KEY'}.',
     );
     exitCode = 64;
     return;
@@ -79,7 +81,7 @@ Future<void> main(List<String> arguments) async {
 
   final settings = AiSettings(
     providerId: provider.id,
-    apiKey: apiKey,
+    apiKey: apiKey ?? '',
     baseUrlOverride: options['base-url'],
     modelOverride: options['model-id'],
   );
@@ -245,6 +247,7 @@ String? _resolveApiKey(AiProvider provider) {
     AiProviderKind.openRouterImages => ['OPENROUTER_API_KEY'],
     AiProviderKind.openaiImages => ['OPENAI_API_KEY'],
     AiProviderKind.cloudflareWorkersAi => ['CLOUDFLARE_API_TOKEN'],
+    AiProviderKind.pollinations => const <String>[],
   };
 
   for (final name in names) {
@@ -255,11 +258,12 @@ String? _resolveApiKey(AiProvider provider) {
 }
 
 /// Environment variable that holds the key for [provider].
-String _apiKeyEnvName(AiProvider provider) => switch (provider.kind) {
+String? _apiKeyEnvName(AiProvider provider) => switch (provider.kind) {
       AiProviderKind.gemini => 'GEMINI_API_KEY',
       AiProviderKind.openRouterImages => 'OPENROUTER_API_KEY',
       AiProviderKind.openaiImages => 'OPENAI_API_KEY',
       AiProviderKind.cloudflareWorkersAi => 'CLOUDFLARE_API_TOKEN',
+      AiProviderKind.pollinations => null,
     };
 
 const String _usage = '''
@@ -279,6 +283,10 @@ Options:
   --name <name>       Output file name (without extension)
   --out <dir>         Output directory (default: build/wraps)
   --help              Show this text
+
+Providers without a key:
+  pollinations-flux    Free, no account, no API key. Draws a flat pattern and
+                       clips it to the vehicle panels.
 
 Environment:
   GEMINI_API_KEY        Key for the Gemini providers

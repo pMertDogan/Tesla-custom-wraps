@@ -24,7 +24,8 @@ templates.
 ## Requirements
 
 - Flutter 3.47 or newer (Dart 3.11+)
-- An API key for one of the supported providers
+- An API key for one of the supported providers — or none at all, if you use
+  **Pollinations**
 
 ## Getting started
 
@@ -36,12 +37,17 @@ flutter run -d chrome          # or: flutter run -d web-server
 The app is a Flutter **web** app. It also compiles for mobile and desktop,
 the asset layout is platform independent.
 
+Open the studio, pick **Pollinations FLUX** in the provider list and press
+**GENERATE WRAP**: that provider needs no account and no key, so a wrap comes
+out of the box. Every other provider needs its own key in Settings.
+
 ## AI providers
 
 Open **Settings** from the home or the studio and pick a provider:
 
 | Provider | Model | Reference image | Cost |
 | --- | --- | --- | --- |
+| Pollinations FLUX | `flux` | no | free, no account, no key |
 | Cloudflare FLUX 2 dev | `@cf/black-forest-labs/flux-2-dev` | yes | free daily allowance |
 | Cloudflare FLUX 2 Klein 9B | `@cf/black-forest-labs/flux-2-klein-9b` | yes | free daily allowance |
 | Cloudflare FLUX 2 Klein 4B | `@cf/black-forest-labs/flux-2-klein-4b` | yes | free daily allowance |
@@ -66,6 +72,40 @@ only.
 The **Custom OpenAI-compatible** option points the studio at any gateway that
 speaks the OpenAI images API (LiteLLM, a local proxy). Set the base URL and
 the model name in Settings.
+
+### Pollinations (no account, no key)
+
+Pick **Pollinations FLUX** and press **GENERATE WRAP**. That is the whole
+setup: no sign-up, no card, no API key, no account. It is the only provider
+that works the moment the studio opens, and unlike Cloudflare it also works in
+the **web build**, because Pollinations answers with
+`Access-Control-Allow-Origin: *`.
+
+There are three things to know about it:
+
+- **It does not copy the panel layout.** The studio therefore asks the model
+  for a flat pattern and the panel mask clips that pattern onto the real body
+  panels afterwards. The result is a proper wrap; the alignment is the mask's
+  job, not the model's.
+- **The prompt stays away from cars.** Naming a vehicle, even to rule it out,
+  is enough to make an image model render one, and a wrap that shows a photo
+  of a car instead of a pattern is worthless. The pattern prompt describes
+  what the frame should hold and says nothing about vehicles.
+- **The free tier is slow.** Pollinations answers **one image every 45
+  seconds per address** and rejects the next request with `402` and a
+  `FREE_LIMIT` code. The studio turns that into a message that says how long
+  to wait.
+
+The service puts a small logo in the corner; the studio asks for `nologo=true`,
+and the panel mask crops anything that survives.
+
+```powershell
+# The same thing from the command line, with no key in sight:
+dart run tool/generate_wrap.dart --model model3-2024-base `
+  --provider pollinations-flux `
+  --prompt "deep midnight blue carbon fibre with cyan circuitry" `
+  --out build/wraps
+```
 
 ### Cloudflare Workers AI (the free one)
 
@@ -252,7 +292,8 @@ dart run tool/generate_wrap.dart \
 
 The key is read from `GEMINI_API_KEY`, `OPENAI_API_KEY`,
 `OPENROUTER_API_KEY` or `CLOUDFLARE_API_TOKEN`, depending on the provider.
-`WRAP_API_KEY` overrides all of them.
+`WRAP_API_KEY` overrides all of them. The **Pollinations** provider needs no
+key at all, so the command runs with no environment set up.
 
 ## Tesla's requirements
 
@@ -314,7 +355,9 @@ catalog on disk and the AI service against a mocked HTTP client.
 ## Roadmap
 
 - **3D preview** — the GLB vehicle models are already wired into the catalog
-  (`assets/models/`), the studio keeps the camera azimuth ready for it.
+  (`assets/models/`). The studio shows the vehicle reference render for now;
+  the camera controls arrive with the models, so nothing in the interface
+  pretends to rotate a car that is not there yet.
 - Manual editing tools (draw, text, logo, layers) — the sidebar already
   carries the entry points.
 - Material controls (metallic, roughness) — they belong to the 3D preview.

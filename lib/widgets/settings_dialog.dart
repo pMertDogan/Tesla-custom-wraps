@@ -142,56 +142,84 @@ class _SettingsDialogState extends State<SettingsDialog> {
                 style: const TextStyle(color: Colors.white38, fontSize: 12),
               ),
               const SizedBox(height: 20),
-              const Text(
-                'API KEY',
-                style: TextStyle(color: Colors.white54, fontSize: 12),
-              ),
-              const SizedBox(height: 8),
-              TextField(
-                controller: _apiKeyController,
-                obscureText: _obscureKey,
-                autocorrect: false,
-                enableSuggestions: false,
-                maxLength: 512,
-                style: const TextStyle(color: Colors.white),
-                decoration: InputDecoration(
-                  labelText: 'API KEY',
-                  labelStyle: const TextStyle(color: Colors.white54),
-                  counterStyle: const TextStyle(color: Colors.white24),
-                  suffixIcon: IconButton(
-                    tooltip: _obscureKey ? 'Show API key' : 'Hide API key',
-                    icon: Icon(
-                      _obscureKey
-                          ? Icons.visibility_off_outlined
-                          : Icons.visibility_outlined,
-                      color: Colors.white54,
+              if (provider.requiresApiKey) ...[
+                const Text(
+                  'API KEY',
+                  style: TextStyle(color: Colors.white54, fontSize: 12),
+                ),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: _apiKeyController,
+                  obscureText: _obscureKey,
+                  autocorrect: false,
+                  enableSuggestions: false,
+                  maxLength: 512,
+                  style: const TextStyle(color: Colors.white),
+                  decoration: InputDecoration(
+                    labelText: 'API KEY',
+                    labelStyle: const TextStyle(color: Colors.white54),
+                    counterStyle: const TextStyle(color: Colors.white24),
+                    suffixIcon: IconButton(
+                      tooltip: _obscureKey ? 'Show API key' : 'Hide API key',
+                      icon: Icon(
+                        _obscureKey
+                            ? Icons.visibility_off_outlined
+                            : Icons.visibility_outlined,
+                        color: Colors.white54,
+                      ),
+                      onPressed: () =>
+                          setState(() => _obscureKey = !_obscureKey),
                     ),
-                    onPressed: () =>
-                        setState(() => _obscureKey = !_obscureKey),
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderSide: const BorderSide(color: Colors.white10),
-                  ),
-                  focusedBorder: const OutlineInputBorder(
-                    borderSide: BorderSide(color: Color(0xFF3D7BFF)),
+                    enabledBorder: OutlineInputBorder(
+                      borderSide: const BorderSide(color: Colors.white10),
+                    ),
+                    focusedBorder: const OutlineInputBorder(
+                      borderSide: BorderSide(color: Color(0xFF3D7BFF)),
+                    ),
                   ),
                 ),
-              ),
-              SwitchListTile(
-                contentPadding: EdgeInsets.zero,
-                title: const Text(
-                  'Remember this key on this device',
-                  style: TextStyle(color: Colors.white70, fontSize: 13),
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text(
+                    'Remember this key on this device',
+                    style: TextStyle(color: Colors.white70, fontSize: 13),
+                  ),
+                  subtitle: const Text(
+                    'Off by default. The key is kept in memory for this session '
+                    'only.',
+                    style: TextStyle(color: Colors.white38, fontSize: 11),
+                  ),
+                  value: _persistApiKey,
+                  activeThumbColor: const Color(0xFF3D7BFF),
+                  onChanged: (value) =>
+                      setState(() => _persistApiKey = value),
                 ),
-                subtitle: const Text(
-                  'Off by default. The key is kept in memory for this session '
-                  'only.',
-                  style: TextStyle(color: Colors.white38, fontSize: 11),
+              ] else
+                Container(
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: Colors.greenAccent.withAlpha(20),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.greenAccent.withAlpha(60)),
+                  ),
+                  child: const Row(
+                    children: [
+                      Icon(Icons.lock_open, color: Colors.greenAccent, size: 18),
+                      SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          'This provider needs no API key. It works the moment '
+                          'you press GENERATE WRAP. The free tier allows one '
+                          'image every 45 seconds.',
+                          style: TextStyle(
+                            color: Colors.white70,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-                value: _persistApiKey,
-                activeThumbColor: const Color(0xFF3D7BFF),
-                onChanged: (value) => setState(() => _persistApiKey = value),
-              ),
               const SizedBox(height: 12),
               const Text(
                 'MODEL (OPTIONAL)',

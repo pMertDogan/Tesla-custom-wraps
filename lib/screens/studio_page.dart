@@ -55,7 +55,6 @@ class _StudioPageState extends State<StudioPage> {
   PreviewMode _mode = PreviewMode.design;
   double _overlayOpacity = 1;
   double _zoom = 1;
-  double _cameraAzimuth = 0;
 
   @override
   void initState() {
@@ -87,8 +86,9 @@ class _StudioPageState extends State<StudioPage> {
 
   Future<void> _generate() async {
     final state = AppScope.read(context);
+    final provider = state.provider;
 
-    if (!state.settings.hasApiKey) {
+    if (provider.requiresApiKey && !state.settings.hasApiKey) {
       _notify('Add your API key in Settings to generate a wrap.');
       await SettingsDialog.show(context);
       return;
@@ -97,12 +97,12 @@ class _StudioPageState extends State<StudioPage> {
     setState(() => _isGenerating = true);
 
     try {
-      final provider = state.provider;
       final prompt = WrapPromptBuilder.build(
         concept: _promptController.text,
         vehicleName: widget.vehicle.name,
         style: WrapStyle.byId(_styleId).hint,
         hasReferenceTemplate: _templateBytes != null,
+        flatPatternOnly: !provider.followsReferenceLayout,
       );
 
       final result = await state.aiService.generate(
@@ -346,9 +346,7 @@ class _StudioPageState extends State<StudioPage> {
           ),
           const SizedBox(height: 6),
           Text(
-            provider.supportsReferenceImage
-                ? 'Sends the UV template as a reference image.'
-                : 'Receives the panel layout as text only.',
+            _providerHint(provider),
             style: const TextStyle(color: Colors.white38, fontSize: 11),
           ),
           const SizedBox(height: 20),
@@ -397,10 +395,12 @@ class _StudioPageState extends State<StudioPage> {
             maxLines: 4,
             maxLength: WrapPromptBuilder.maxConceptLength,
             style: const TextStyle(color: Colors.white),
-            decoration: const InputDecoration(
-              hintText: 'Describe your wrap design...',
-              hintStyle: TextStyle(color: Colors.white24),
-              counterStyle: TextStyle(color: Colors.white24),
+            decoration: InputDecoration(
+              hintText: provider.followsReferenceLayout
+                  ? 'Describe your wrap design...'
+                  : 'Describe the pattern, not the car...',
+              hintStyle: const TextStyle(color: Colors.white24),
+              counterStyle: const TextStyle(color: Colors.white24),
             ),
           ),
           const SizedBox(height: 12),
@@ -465,6 +465,21 @@ class _StudioPageState extends State<StudioPage> {
         ],
       ),
     );
+  }
+
+  /// One line summary of what the selected provider does with the template.
+  String _providerHint(AiProvider provider) {
+    if (!provider.requiresApiKey) {
+      return 'No API key needed. Draws a flat pattern and clips it to the '
+          'panels. One free image every 45 seconds.';
+    }
+    if (!provider.supportsReferenceImage) {
+      return 'Receives the panel layout as text only.';
+    }
+    if (!provider.followsReferenceLayout) {
+      return 'Draws a flat pattern; the panel mask places it on the car.';
+    }
+    return 'Sends the UV template as a reference image.';
   }
 
   Widget _buildTemplateInfo() {
@@ -664,30 +679,6 @@ class _StudioPageState extends State<StudioPage> {
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Tooltip(
-            message: 'Rotate Left',
-            child: Semantics(
-              label: 'Rotate vehicle left',
-              button: true,
-              child: IconButton(
-                icon: const Icon(Icons.rotate_left, color: Colors.white),
-                onPressed: () =>
-                    setState(() => _cameraAzimuth -= 15),
-              ),
-            ),
-          ),
-          Tooltip(
-            message: 'Rotate Right',
-            child: Semantics(
-              label: 'Rotate vehicle right',
-              button: true,
-              child: IconButton(
-                icon: const Icon(Icons.rotate_right, color: Colors.white),
-                onPressed: () => setState(() => _cameraAzimuth += 15),
-              ),
-            ),
-          ),
-          const VerticalDivider(color: Colors.white10, width: 40),
-          Tooltip(
             message: 'Zoom In',
             child: Semantics(
               label: 'Zoom in on vehicle',
@@ -715,10 +706,14 @@ class _StudioPageState extends State<StudioPage> {
           ),
           const SizedBox(width: 24),
           Tooltip(
-            message: '3D camera azimuth',
-            child: Text(
-              'Camera ${_cameraAzimuth.round()}°',
-              style: const TextStyle(color: Colors.white38, fontSize: 12),
+            message: 'Zoom to fit',
+            child: Semantics(
+              label: 'Reset zoom',
+              button: true,
+              child: IconButton(
+                icon: const Icon(Icons.fit_screen, color: Colors.white),
+                onPressed: () => setState(() => _zoom = 1),
+              ),
             ),
           ),
         ],

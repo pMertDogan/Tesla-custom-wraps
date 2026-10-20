@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
+import 'package:image/image.dart' as img;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:tesla_custom_wraps/screens/studio_page.dart';
 import 'package:tesla_custom_wraps/services/ai_service.dart';
@@ -61,9 +64,12 @@ void main() {
     expect(find.byTooltip('Adjust Zoom'), findsOneWidget);
     expect(find.bySemanticsLabel(RegExp(r'Zoom level')), findsOneWidget);
 
-    // Check Rotate Left button
-    expect(find.byTooltip('Rotate Left'), findsOneWidget);
-    expect(find.bySemanticsLabel('Rotate vehicle left'), findsOneWidget);
+    // The 3D preview is not live yet, so the studio must not show camera
+    // controls that do nothing.
+    expect(find.byTooltip('Rotate Left'), findsNothing);
+    expect(find.bySemanticsLabel('Rotate vehicle left'), findsNothing);
+    expect(find.byTooltip('Rotate Right'), findsNothing);
+    expect(find.bySemanticsLabel('Rotate vehicle right'), findsNothing);
 
     // Check Zoom In button
     expect(find.byTooltip('Zoom In'), findsOneWidget);
@@ -108,4 +114,60 @@ void main() {
     expect(find.text('PREVIEW CONTROLS'), findsOneWidget);
     expect(find.byType(DropdownButton<String>), findsNWidgets(2));
   });
+
+  testWidgets('Studio generates without an API key for a keyless provider', (
+    WidgetTester tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({
+      'ai.provider_id': 'pollinations-flux',
+    });
+
+    tester.view.physicalSize = const Size(1920, 1080);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final service = AiService(
+      client: MockClient(
+        (_) async => http.Response.bytes(_solidPng(), 200),
+      ),
+    );
+
+    final state = AppState(aiService: service);
+    await state.load();
+
+    await tester.pumpWidget(
+      AppScope(
+        state: state,
+        child: MaterialApp(
+          home: StudioPage(vehicle: VehicleService.getVehicles().first),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // The studio tells the user that this provider needs no key.
+    expect(
+      find.text(
+        'No API key needed. Draws a flat pattern and clips it to the panels. '
+        'One free image every 45 seconds.',
+      ),
+      findsOneWidget,
+    );
+
+    await tester.tap(find.bySemanticsLabel('Generate wrap design'));
+    await tester.pumpAndSettle();
+
+    // The request went straight out instead of stopping at the settings
+    // dialog, and the design landed in the session history.
+    expect(find.text('AI SETTINGS'), findsNothing);
+    expect(state.history, hasLength(1));
+  });
+}
+
+/// A plain PNG the fake provider can hand back.
+List<int> _solidPng() {
+  final image = img.Image(width: 256, height: 256);
+  img.fill(image, color: img.ColorRgb8(20, 90, 160));
+  return img.encodePng(image);
 }

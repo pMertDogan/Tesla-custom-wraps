@@ -4,6 +4,7 @@ import 'dart:typed_data';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
+import 'package:image/image.dart' as img;
 import 'package:tesla_custom_wraps/models/ai_provider.dart';
 import 'package:tesla_custom_wraps/models/ai_settings.dart';
 import 'package:tesla_custom_wraps/services/ai_service.dart';
@@ -772,4 +773,168 @@ void main() {
       expect(message, isNot(contains('CORS')));
     });
   });
+
+  group('AiService with Pollinations', () {
+    AiSettings keylessSettings() => const AiSettings(
+          providerId: 'pollinations-flux',
+          apiKey: '',
+        );
+
+    test('generates without an API key', () async {
+      final service = AiService(
+        client: MockClient(
+          (_) async => http.Response.bytes(
+            [0xFF, 0xD8, 0xFF, 0xE0],
+            200,
+            headers: {'content-type': 'image/jpeg'},
+          ),
+        ),
+      );
+
+      final result = await service.generate(
+        provider: AiProviderCatalog.pollinationsFlux,
+        settings: keylessSettings(),
+        prompt: 'blue lightning',
+        referenceImage: _noisePng(128),
+      );
+
+      expect(result.mimeType, 'image/jpeg');
+      expect(result.bytes, isNotEmpty);
+    });
+
+    test('carries the prompt in the path', () async {
+      late Uri sentUri;
+
+      final service = AiService(
+        client: MockClient((request) async {
+          sentUri = request.url;
+          return http.Response.bytes(
+            [0xFF, 0xD8],
+            200,
+            headers: {'content-type': 'image/jpeg'},
+          );
+        }),
+      );
+
+      await service.generate(
+        provider: AiProviderCatalog.pollinationsFlux,
+        settings: keylessSettings(),
+        prompt: 'blue lightning',
+      );
+
+      expect(sentUri.host, 'image.pollinations.ai');
+      expect(sentUri.pathSegments.first, 'prompt');
+      expect(sentUri.pathSegments.last, contains('blue lightning'));
+      expect(sentUri.queryParameters['model'], 'flux');
+      expect(sentUri.queryParameters['nologo'], 'true');
+      expect(sentUri.queryParameters['seed'], isNotEmpty);
+    });
+
+    test('leaves the template out of the request', () async {
+      late Uri sentUri;
+
+      final service = AiService(
+        client: MockClient((request) async {
+          sentUri = request.url;
+          return http.Response.bytes(
+            [0xFF, 0xD8],
+            200,
+            headers: {'content-type': 'image/jpeg'},
+          );
+        }),
+      );
+
+      await service.generate(
+        provider: AiProviderCatalog.pollinationsFlux,
+        settings: keylessSettings(),
+        prompt: 'blue lightning',
+        referenceImage: _noisePng(640),
+      );
+
+      // The car outline in Tesla's template makes the model render a car.
+      expect(sentUri.queryParameters['image'], isNull);
+      expect(sentUri.toString().length, lessThan(2000));
+    });
+
+    test('generates without a template at all', () async {
+      final service = AiService(
+        client: MockClient(
+          (_) async => http.Response.bytes(
+            [0xFF, 0xD8, 0xFF, 0xE0],
+            200,
+            headers: {'content-type': 'image/jpeg'},
+          ),
+        ),
+      );
+
+      final result = await service.generate(
+        provider: AiProviderCatalog.pollinationsFlux,
+        settings: keylessSettings(),
+        prompt: 'blue lightning',
+      );
+
+      expect(result.bytes, isNotEmpty);
+    });
+
+    test('explains the free rate limit', () async {
+      final service = AiService(
+        client: MockClient(
+          (_) async => http.Response(
+            '{"status":402,"error":{"code":"FREE_LIMIT","message":'
+            '"Free limit reached: 1 image every 45 seconds per IP. '
+            'Retry after 41s"}}',
+            402,
+          ),
+        ),
+      );
+
+      expect(
+        () => service.generate(
+          provider: AiProviderCatalog.pollinationsFlux,
+          settings: keylessSettings(),
+          prompt: 'blue lightning',
+        ),
+        throwsA(
+          isA<AiException>().having(
+            (error) => error.message,
+            'message',
+            allOf(contains('45 seconds'), contains('41')),
+          ),
+        ),
+      );
+    });
+
+    test('offers a provider that needs no account at all', () {
+      final provider = AiProviderCatalog.pollinationsFlux;
+
+      expect(provider.requiresApiKey, isFalse);
+      expect(provider.followsReferenceLayout, isFalse);
+      expect(AiProviderCatalog.all, contains(provider));
+    });
+  });
+}
+
+/// Builds a PNG full of noise.
+///
+/// A solid colour compresses to almost nothing, so the tests need real noise
+/// to reproduce the size of Tesla's line art templates.
+Uint8List _noisePng(int size) {
+  final rgba = Uint8List(size * size * 4);
+  var seed = 987654321;
+  for (var i = 0; i < size * size; i++) {
+    seed = (seed * 1103515245 + 12345) & 0x7fffffff;
+    final value = (seed >> 16) & 0xFF;
+    rgba[i * 4] = value;
+    rgba[i * 4 + 1] = value;
+    rgba[i * 4 + 2] = value;
+    rgba[i * 4 + 3] = 255;
+  }
+
+  final image = img.Image.fromBytes(
+    width: size,
+    height: size,
+    bytes: rgba.buffer,
+    numChannels: 4,
+  );
+  return img.encodePng(image);
 }

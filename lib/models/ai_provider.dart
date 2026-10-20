@@ -19,6 +19,13 @@ enum AiProviderKind {
   /// is the only provider that can generate a wrap without paying. The
   /// request is a multipart form and the template travels as a file.
   cloudflareWorkersAi,
+
+  /// Pollinations `GET /prompt/{text}`.
+  ///
+  /// No account and no API key: the studio can draw a wrap the moment it
+  /// is opened. The service is slower than the others and puts a small
+  /// watermark in the corner, but the panel mask crops that away.
+  pollinations,
 }
 
 /// How the request body has to be encoded for a provider.
@@ -68,6 +75,20 @@ class AiProvider {
   /// FLUX 1 models want JSON. Everything else speaks JSON.
   final AiBodyFormat bodyFormat;
 
+  /// Whether the provider needs an API key.
+  ///
+  /// Pollinations serves images without an account, so the studio can draw
+  /// a wrap without asking for anything.
+  final bool requiresApiKey;
+
+  /// Whether the provider actually reproduces the reference layout.
+  ///
+  /// Most models copy the panel outlines of the UV template they are given.
+  /// Pollinations only uses the template as a general colour and texture
+  /// cue, so the studio asks it for a flat pattern instead and lets the panel
+  /// mask do the alignment.
+  final bool followsReferenceLayout;
+
   /// Where users can obtain an API key.
   final String? docsUrl;
 
@@ -81,6 +102,8 @@ class AiProvider {
     required this.model,
     required this.supportsReferenceImage,
     this.bodyFormat = AiBodyFormat.json,
+    this.requiresApiKey = true,
+    this.followsReferenceLayout = true,
     this.docsUrl,
   });
 
@@ -269,6 +292,7 @@ class AiProviderCatalog {
     cloudflareFlux2Klein,
     cloudflareFlux2Klein4b,
     cloudflareFlux1Schnell,
+    pollinationsFlux,
     customOpenAi,
   ];
 
@@ -345,6 +369,28 @@ class AiProviderCatalog {
     model: '@cf/black-forest-labs/flux-1-schnell',
     supportsReferenceImage: false,
     docsUrl: 'https://dash.cloudflare.com/profile/api-tokens',
+  );
+
+  /// Pollinations with FLUX, the one provider that needs no account at all.
+  ///
+  /// It ignores the request shape and draws from the prompt alone, so the
+  /// studio asks for a flat pattern instead of a car, and the panel mask
+  /// clips the result onto the real body panels. The free tier answers one
+  /// image every 45 seconds per address.
+  static const AiProvider pollinationsFlux = AiProvider(
+    id: 'pollinations-flux',
+    label: 'Pollinations FLUX (no key)',
+    vendor: 'Pollinations',
+    description: 'Free and no API key needed. Draws a flat pattern that the '
+        'panel mask clips onto the car. The free tier allows one image every '
+        '45 seconds.',
+    kind: AiProviderKind.pollinations,
+    baseUrl: 'https://image.pollinations.ai',
+    model: 'flux',
+    supportsReferenceImage: false,
+    requiresApiKey: false,
+    followsReferenceLayout: false,
+    docsUrl: 'https://pollinations.ai',
   );
 
   /// Looks a provider up by id, falling back to [gemini3ProImage].

@@ -3,6 +3,7 @@ import 'dart:typed_data';
 
 import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart' show MediaType;
+import 'package:image/image.dart' as img;
 
 import '../models/ai_provider.dart';
 import '../models/ai_settings.dart';
@@ -85,6 +86,31 @@ class AiService {
   /// How long a single generation request may take.
   static const Duration requestTimeout = Duration(seconds: 180);
 
+  /// Longest edge of the reference image sent to Pollinations.
+  ///
+  /// The service carries the image in the URL, so it has to stay small
+  /// enough for a web server to accept the request.
+  static const int referenceMaxEdge = 512;
+
+  /// JPEG quality used for the Pollinations reference image.
+  static const int referenceQuality = 70;
+
+  /// Longest base64 payload the reference image may reach.
+  static const int referenceMaxBase64Length = 60000;
+
+  /// Reference encodings tried in order, from the sharpest to the smallest.
+  ///
+  /// Tesla's own templates fit in the first entry. The rest are the safety
+  /// net for artwork that does not compress as well.
+  static const List<(int, int)> _referenceEncodings = [
+    (referenceMaxEdge, referenceQuality),
+    (referenceMaxEdge, 55),
+    (384, 60),
+    (256, 55),
+    (192, 50),
+    (128, 45),
+  ];
+
   /// Generates a wrap texture.
   ///
   /// [prompt] should already contain the wrap contract, see
@@ -102,7 +128,7 @@ class AiService {
     int? width,
     int? height,
   }) async {
-    if (!settings.hasApiKey) {
+    if (provider.requiresApiKey && !settings.hasApiKey) {
       throw const AiException(
         'No API key configured. Open Settings and add a key for your provider.',
       );
@@ -145,7 +171,146 @@ class AiService {
           width: width,
           height: height,
         );
+      case AiProviderKind.pollinations:
+        return _generateWithPollinations(
+          provider: provider,
+          settings: settings,
+          prompt: prompt,
+          // A provider that paints a flat pattern has no use for the UV
+          // template, and the car outline in it pushes the model towards
+          // rendering a car instead of a wrap pattern.
+          referenceImage:
+              provider.followsReferenceLayout ? effectiveReference : null,
+          width: width,
+          height: height,
+        );
     }
+  }
+
+  /// Generates a wrap through Pollinations.
+  ///
+  /// Pollinations serves images from a plain URL and asks for no account, so
+  /// this is the provider that works the moment the studio opens. It takes
+  /// the prompt in the path.
+  ///
+  /// No reference image is needed: the provider paints a flat pattern from
+  /// the prompt and the panel mask places it on the car. Attaching Tesla's
+  /// template would only push the model towards rendering a car.
+  ///
+  /// The free tier answers one image every 45 seconds per address, which
+  /// arrives as a `402` with a `FREE_LIMIT` code.
+  Future<GeneratedImage> _generateWithPollinations({
+    required AiProvider provider,
+    required AiSettings settings,
+    required String prompt,
+    Uint8List? referenceImage,
+    int? width,
+    int? height,
+  }) async {
+    final baseUrl = _effectiveBaseUrl(provider, settings);
+    final model = _effectiveModel(provider, settings);
+
+    final query = <String, String>{
+      'width': '${width ?? 1024}',
+      'height': '${height ?? 1024}',
+      'model': model,
+      'seed': '${DateTime.now().millisecondsSinceEpoch % 100000}',
+      'nologo': 'true',
+    };
+
+    if (referenceImage != null) {
+      final encoded = _encodePollinationsReference(referenceImage);
+      if (encoded == null) {
+        throw const AiException(
+          'The vehicle template could not be prepared for Pollinations. Pick '
+          'another vehicle or try again.',
+        );
+      }
+      query['image'] = encoded;
+    }
+
+    final uri = Uri.parse(
+      '${_stripTrailingSlash(baseUrl)}/prompt/'
+      '${Uri.encodeComponent(prompt)}?${Uri(queryParameters: query).query}',
+    );
+
+    final http.Response response;
+    try {
+      response = await _client.get(uri).timeout(requestTimeout);
+    } on Exception catch (error) {
+      throw AiException(
+        networkFailureMessage(provider),
+        detail: error.toString(),
+      );
+    }
+
+    if (response.statusCode != 200) {
+      throw AiException(
+        _describeProviderError(
+          provider,
+          response.statusCode,
+          _decodeBody(response.body),
+          model: model,
+        ),
+        statusCode: response.statusCode,
+        detail: response.body,
+      );
+    }
+
+    if (response.bodyBytes.isEmpty) {
+      throw const AiException(
+        'Pollinations did not return an image. Try rephrasing your description.',
+      );
+    }
+
+    final contentType = response.headers['content-type'] ?? 'image/jpeg';
+    return GeneratedImage(
+      response.bodyBytes,
+      contentType.contains('png') ? 'image/png' : 'image/jpeg',
+    );
+  }
+
+  /// Prepares the reference image for a Pollinations request.
+  ///
+  /// Tesla's UV templates are 2,000 pixel wide PNGs of thin black lines on
+  /// white. As base64 they run to 250 kB, which no server accepts in a URL.
+  /// Downscaling to [referenceMaxEdge] and re-encoding as JPEG keeps the line
+  /// art readable for the model while the encoded payload drops to about
+  /// 32 kB.
+  ///
+  /// The size limit is enforced rather than assumed: if the artwork does not
+  /// compress well enough, smaller encodings are tried until the payload
+  /// fits. Returns `null` when nothing fits or the image cannot be decoded.
+  String? _encodePollinationsReference(Uint8List referenceImage) {
+    final decoded = img.decodeImage(referenceImage);
+    if (decoded == null) return null;
+
+    for (final (maxEdge, quality) in _referenceEncodings) {
+      final scaled = _resizeToFit(decoded, maxEdge);
+      final encoded = base64Encode(img.encodeJpg(scaled, quality: quality));
+      if (encoded.length <= referenceMaxBase64Length) return encoded;
+    }
+    return null;
+  }
+
+  /// Scales [source] down so that its longest edge is at most [maxEdge].
+  img.Image _resizeToFit(img.Image source, int maxEdge) {
+    final longestEdge =
+        source.width > source.height ? source.width : source.height;
+    if (longestEdge <= maxEdge) return source;
+
+    if (source.width >= source.height) {
+      return img.copyResize(
+        source,
+        width: maxEdge,
+        height: ((source.height * maxEdge) / source.width).round(),
+      );
+    }
+    return img.copyResize(
+      source,
+      width: ((source.width * maxEdge) / source.height).round(),
+      height: maxEdge,
+    );
   }
 
   Future<GeneratedImage> _generateWithGemini({
@@ -792,13 +957,27 @@ class AiService {
     return null;
   }
 
+  /// Reads the wait time out of the Pollinations rate limit message.
+  ///
+  /// The free tier answers `402` with a `FREE_LIMIT` code and a message that
+  /// says how long to wait, for example `Retry after 41s`.
+  int? _pollinationsRetrySeconds(String? providerMessage) {
+    if (providerMessage == null) return null;
+    if (!providerMessage.toLowerCase().contains('free limit')) return null;
+
+    final match = RegExp(
+      r'retry after\s+(\d+)',
+      caseSensitive: false,
+    ).firstMatch(providerMessage);
+    return match == null ? null : int.parse(match.group(1)!);
+  }
+
   String _describeProviderError(
     AiProvider provider,
     int statusCode,
     Map<String, dynamic>? decoded, {
     String? model,
-  }) {
-    final providerMessage = _extractProviderMessage(decoded);
+  }) {    final providerMessage = _extractProviderMessage(decoded);
     final lower = (providerMessage ?? '').toLowerCase();
 
     if (lower.contains('daily free allocation')) {
@@ -810,6 +989,14 @@ class AiService {
           'Settings.';
     }
     if (statusCode == 402) {
+      if (provider.kind == AiProviderKind.pollinations) {
+        final wait = _pollinationsRetrySeconds(providerMessage);
+        if (wait != null) {
+          return '${provider.label} allows one free image every 45 seconds. '
+              'Try again in $wait seconds.';
+        }
+        return '${provider.label} refused the request. Try again in a moment.';
+      }
       return '${provider.label} has no credit left for image generation. Add '
           'credits to the account and try again.';
     }
