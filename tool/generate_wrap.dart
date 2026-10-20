@@ -92,11 +92,16 @@ Future<void> main(List<String> arguments) async {
       prompt: prompt,
       referenceImage: templateBytes,
       aspectRatio: vehicle.aspectRatio,
+      width: vehicle.templateWidth,
+      height: vehicle.templateHeight,
     );
 
     stdout.writeln('Received ${result.bytes.length} bytes (${result.mimeType}).');
     if (result.cost != null) {
       stdout.writeln('Cost   : \$${result.cost!.toStringAsFixed(4)}');
+    }
+    if (result.units != null) {
+      stdout.writeln('Usage  : ${result.units} Cloudflare neurons');
     }
 
     final mask = TemplateMasker.buildMask(templateBytes);
@@ -239,6 +244,7 @@ String? _resolveApiKey(AiProvider provider) {
     AiProviderKind.gemini => ['GEMINI_API_KEY', 'GOOGLE_API_KEY'],
     AiProviderKind.openRouterImages => ['OPENROUTER_API_KEY'],
     AiProviderKind.openaiImages => ['OPENAI_API_KEY'],
+    AiProviderKind.cloudflareWorkersAi => ['CLOUDFLARE_API_TOKEN'],
   };
 
   for (final name in names) {
@@ -253,6 +259,7 @@ String _apiKeyEnvName(AiProvider provider) => switch (provider.kind) {
       AiProviderKind.gemini => 'GEMINI_API_KEY',
       AiProviderKind.openRouterImages => 'OPENROUTER_API_KEY',
       AiProviderKind.openaiImages => 'OPENAI_API_KEY',
+      AiProviderKind.cloudflareWorkersAi => 'CLOUDFLARE_API_TOKEN',
     };
 
 const String _usage = '''
@@ -274,8 +281,9 @@ Options:
   --help              Show this text
 
 Environment:
-  GEMINI_API_KEY      Key for the Gemini providers
-  OPENAI_API_KEY      Key for the OpenAI compatible providers
-  OPENROUTER_API_KEY  Key for the OpenRouter providers
-  WRAP_API_KEY        Overrides all of them
+  GEMINI_API_KEY        Key for the Gemini providers
+  OPENAI_API_KEY        Key for the OpenAI compatible providers
+  OPENROUTER_API_KEY    Key for the OpenRouter providers
+  CLOUDFLARE_API_TOKEN  Key for the Cloudflare Workers AI providers
+  WRAP_API_KEY          Overrides all of them
 ''';

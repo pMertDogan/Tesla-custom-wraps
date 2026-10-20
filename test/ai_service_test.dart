@@ -13,8 +13,15 @@ const String _tinyPngBase64 =
     'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAE'
     'hQGAhKmMIQAAAABJRU5ErkJggg==';
 
-AiSettings _settings({String providerId = 'gemini-3-pro-image'}) {
-  return AiSettings(providerId: providerId, apiKey: 'test-key');
+AiSettings _settings({
+  String providerId = 'gemini-3-pro-image',
+  String? baseUrl,
+}) {
+  return AiSettings(
+    providerId: providerId,
+    apiKey: 'test-key',
+    baseUrlOverride: baseUrl,
+  );
 }
 
 void main() {
@@ -480,6 +487,174 @@ void main() {
           ),
         ),
       );
+    });
+  });
+
+  group('AiService with Cloudflare Workers AI', () {
+    const accountId = '0123456789abcdef';
+    const baseUrl =
+        'https://api.cloudflare.com/client/v4/accounts/$accountId/ai/run';
+
+    AiSettings cloudflareSettings() => _settings(
+          providerId: 'cloudflare-flux-2-dev',
+          baseUrl: baseUrl,
+        );
+
+    test('posts a multipart request with the template as a file', () async {
+      late Uri sentUri;
+      late Map<String, String> sentFields;
+      late List<String?> sentFiles;
+      late String? sentAuth;
+
+      // The first attempt is answered with a rejection so the fallback
+      // chain is exercised, the second one succeeds.
+      var call = 0;
+      final client = MockClient.streaming((request, bodyStream) async {
+        call++;
+        final multipart = request as http.MultipartRequest;
+        sentUri = multipart.url;
+        sentFields = Map<String, String>.from(multipart.fields);
+        sentFiles = multipart.files.map((f) => f.filename).toList();
+        sentAuth = multipart.headers['Authorization'];
+        await bodyStream.toBytes();
+        if (call == 1) {
+          return http.StreamedResponse(
+            Stream.value(
+              utf8.encode(
+                jsonEncode({
+                  'errors': [
+                    {
+                      'code': 5006,
+                      'message': "Additional or unevaluated properties '/seed' "
+                          "at '/' not allowed",
+                    },
+                  ],
+                }),
+              ),
+            ),
+            400,
+          );
+        }
+        return http.StreamedResponse(
+          Stream.value(
+            utf8.encode(
+              jsonEncode({
+                'result': {
+                  'image': _tinyPngBase64,
+                  'usage': {'neurons': 900.0},
+                },
+                'success': true,
+              }),
+            ),
+          ),
+          200,
+        );
+      });
+
+      final service = AiService(client: client);
+      final result = await service.generate(
+        provider: AiProviderCatalog.cloudflareFlux2Dev,
+        settings: cloudflareSettings(),
+        prompt: 'red flames',
+        referenceImage: Uint8List.fromList([1, 2, 3, 4]),
+        width: 1024,
+        height: 1024,
+      );
+
+      expect(sentUri.toString(),
+          '$baseUrl/@cf/black-forest-labs/flux-2-dev');
+      expect(sentAuth, 'Bearer test-key');
+      expect(sentFields['prompt'], 'red flames');
+      expect(sentFiles, contains('template.png'));
+      expect(result.bytes, isNotEmpty);
+      expect(result.units, '900.0');
+    });
+
+    test('explains that the daily free allowance is used up', () async {
+      final service = AiService(
+        client: MockClient(
+          (_) async => http.Response(
+            jsonEncode({
+              'errors': [
+                {
+                  'code': 4006,
+                  'message': 'you have used up your daily free allocation of '
+                      '10,000 neurons',
+                },
+              ],
+            }),
+            429,
+          ),
+        ),
+      );
+
+      expect(
+        () => service.generate(
+          provider: AiProviderCatalog.cloudflareFlux2Dev,
+          settings: cloudflareSettings(),
+          prompt: 'red flames',
+        ),
+        throwsA(
+          isA<AiException>().having(
+            (error) => error.message,
+            'message',
+            contains('daily free allowance'),
+          ),
+        ),
+      );
+    });
+
+    test('asks for a real account id before calling the API', () async {
+      final service = AiService(
+        client: MockClient(
+          (_) async => http.Response('{}', 200),
+        ),
+      );
+
+      expect(
+        () => service.generate(
+          provider: AiProviderCatalog.cloudflareFlux2Dev,
+          settings: _settings(providerId: 'cloudflare-flux-2-dev'),
+          prompt: 'red flames',
+        ),
+        throwsA(
+          isA<AiException>().having(
+            (error) => error.message,
+            'message',
+            contains('account id'),
+          ),
+        ),
+      );
+    });
+
+    test('blames CORS when Cloudflare is called from a browser', () {
+      final message = networkFailureMessage(
+        AiProviderCatalog.cloudflareFlux2Dev,
+        isWeb: true,
+      );
+
+      expect(message, contains('CORS'));
+      expect(message, contains('proxy'));
+    });
+
+    test('blames the connection when Cloudflare is called from a device', () {
+      final message = networkFailureMessage(
+        AiProviderCatalog.cloudflareFlux2Dev,
+        isWeb: false,
+      );
+
+      expect(message, contains('Could not reach'));
+      expect(message, isNot(contains('CORS')));
+    });
+
+    test('keeps the connection wording for providers the browser can reach', () {
+      final message = networkFailureMessage(
+        AiProviderCatalog.openRouterFluxKlein,
+        isWeb: true,
+      );
+
+      expect(message, contains('Could not reach'));
+      expect(message, isNot(contains('CORS')));
     });
   });
 }

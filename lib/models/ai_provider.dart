@@ -12,6 +12,13 @@ enum AiProviderKind {
   /// `input_references` entry, which is what keeps the generated artwork
   /// aligned with the vehicle panels.
   openRouterImages,
+
+  /// Cloudflare Workers AI `POST /accounts/{id}/ai/run/{model}`.
+  ///
+  /// Cloudflare gives every account a free daily neuron allowance, so this
+  /// is the only provider that can generate a wrap without paying. The
+  /// request is a multipart form and the template travels as a file.
+  cloudflareWorkersAi,
 }
 
 /// A text-to-image provider the studio can talk to.
@@ -238,8 +245,62 @@ class AiProviderCatalog {
     openRouterQwenTurbo,
     openRouterNanoBanana,
     openRouterGemini3Pro,
+    cloudflareFlux2Dev,
+    cloudflareFlux2Klein,
+    cloudflareFlux1Schnell,
     customOpenAi,
   ];
+
+  /// Cloudflare Workers AI with FLUX 2 dev, the strongest free option.
+  static const AiProvider cloudflareFlux2Dev = AiProvider(
+    id: 'cloudflare-flux-2-dev',
+    label: 'Cloudflare FLUX 2 dev',
+    vendor: 'Cloudflare',
+    description: 'Free on the Cloudflare daily allowance (about 900 neurons '
+        'per image, roughly 11 images a day). Sends the UV template as a '
+        'reference image.',
+    kind: AiProviderKind.cloudflareWorkersAi,
+    baseUrl: 'https://api.cloudflare.com/client/v4/accounts/'
+        'YOUR_ACCOUNT_ID/ai/run',
+    model: '@cf/black-forest-labs/flux-2-dev',
+    supportsReferenceImage: true,
+    docsUrl: 'https://dash.cloudflare.com/profile/api-tokens',
+  );
+
+  /// Cloudflare Workers AI with FLUX 2 Klein 9B.
+  static const AiProvider cloudflareFlux2Klein = AiProvider(
+    id: 'cloudflare-flux-2-klein-9b',
+    label: 'Cloudflare FLUX 2 Klein 9B',
+    vendor: 'Cloudflare',
+    description: 'Free on the Cloudflare daily allowance (about 1,500 '
+        'neurons per image, roughly 6 images a day). Sends the UV template '
+        'as a reference image.',
+    kind: AiProviderKind.cloudflareWorkersAi,
+    baseUrl: 'https://api.cloudflare.com/client/v4/accounts/'
+        'YOUR_ACCOUNT_ID/ai/run',
+    model: '@cf/black-forest-labs/flux-2-klein-9b',
+    supportsReferenceImage: true,
+    docsUrl: 'https://dash.cloudflare.com/profile/api-tokens',
+  );
+
+  /// Cloudflare Workers AI with FLUX 1 schnell, the cheapest of all.
+  ///
+  /// This one is text only, so the studio has to describe the layout
+  /// instead of showing the template.
+  static const AiProvider cloudflareFlux1Schnell = AiProvider(
+    id: 'cloudflare-flux-1-schnell',
+    label: 'Cloudflare FLUX 1 schnell',
+    vendor: 'Cloudflare',
+    description: 'Cheapest option anywhere (about 173 neurons per image, '
+        'roughly 57 images a day) but text only, so the layout is described '
+        'instead of shown.',
+    kind: AiProviderKind.cloudflareWorkersAi,
+    baseUrl: 'https://api.cloudflare.com/client/v4/accounts/'
+        'YOUR_ACCOUNT_ID/ai/run',
+    model: '@cf/black-forest-labs/flux-1-schnell',
+    supportsReferenceImage: false,
+    docsUrl: 'https://dash.cloudflare.com/profile/api-tokens',
+  );
 
   /// Looks a provider up by id, falling back to [gemini3ProImage].
   static AiProvider byId(String id) {

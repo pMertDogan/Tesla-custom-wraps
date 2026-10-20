@@ -111,6 +111,8 @@ class _StudioPageState extends State<StudioPage> {
         prompt: prompt,
         referenceImage: _templateBytes,
         aspectRatio: widget.vehicle.aspectRatio,
+        width: widget.vehicle.templateWidth,
+        height: widget.vehicle.templateHeight,
       );
 
       final design = await _conform(result.bytes);
@@ -124,7 +126,8 @@ class _StudioPageState extends State<StudioPage> {
       });
       _notify(
         'Wrap generated with ${provider.label}.'
-        '${result.cost == null ? '' : ' Cost: \$${result.cost!.toStringAsFixed(4)}'}',
+        '${result.cost == null ? '' : ' Cost: \$${result.cost!.toStringAsFixed(4)}'}'
+        '${result.units == null ? '' : ' Usage: ${result.units} neurons'}',
       );
     } on AiException catch (error) {
       _notify(error.message);

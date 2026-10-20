@@ -40,27 +40,114 @@ the asset layout is platform independent.
 
 Open **Settings** from the home or the studio and pick a provider:
 
-| Provider | Model | Reference image |
-| --- | --- | --- |
-| Gemini 3 Pro Image | `gemini-3-pro-image` | yes |
-| Gemini Nano Banana 2.1 | `gemini-nano-banana-2.1` | yes |
-| Gemini 2.5 Flash Image | `gemini-2.5-flash-image` | yes |
-| Gemini 3.1 Flash Image | `gemini-3.1-flash-image` | yes |
-| OpenAI gpt-image-1 | `gpt-image-1` | no |
-| OpenAI DALL-E 3 | `dall-e-3` | no |
-| OpenRouter FLUX 3 Klein | `black-forest-labs/flux-3-image-klein` | yes |
-| OpenRouter Qwen Image 2.1 Turbo | `qwen/qwen-image-2.1-turbo` | yes |
-| OpenRouter Nano Banana 2.1 | `google/gemini-nano-banana-2.1` | yes |
-| OpenRouter Gemini 3 Pro Image | `google/gemini-3-pro-image` | yes |
-| Custom OpenAI-compatible | your own | no |
+| Provider | Model | Reference image | Cost |
+| --- | --- | --- | --- |
+| Cloudflare FLUX 2 dev | `@cf/black-forest-labs/flux-2-dev` | yes | free daily allowance |
+| Cloudflare FLUX 2 Klein 9B | `@cf/black-forest-labs/flux-2-klein-9b` | yes | free daily allowance |
+| Cloudflare FLUX 1 schnell | `@cf/black-forest-labs/flux-1-schnell` | no | free daily allowance |
+| Gemini 3 Pro Image | `gemini-3-pro-image` | yes | paid |
+| Gemini Nano Banana 2.1 | `gemini-nano-banana-2.1` | yes | paid |
+| Gemini 2.5 Flash Image | `gemini-2.5-flash-image` | yes | paid |
+| Gemini 3.1 Flash Image | `gemini-3.1-flash-image` | yes | paid |
+| OpenRouter FLUX 3 Klein | `black-forest-labs/flux-3-image-klein` | yes | about \$0.009 per image |
+| OpenRouter Qwen Image 2.1 Turbo | `qwen/qwen-image-2.1-turbo` | yes | about \$0.018 per image |
+| OpenRouter Nano Banana 2.1 | `google/gemini-nano-banana-2.1` | yes | about \$0.04 per image |
+| OpenRouter Gemini 3 Pro Image | `google/gemini-3-pro-image` | yes | about \$0.13 per image |
+| OpenAI gpt-image-1 | `gpt-image-1` | no | paid |
+| OpenAI DALL-E 3 | `dall-e-3` | no | paid |
+| Custom OpenAI-compatible | your own | no | depends |
 
-The Gemini and OpenRouter models receive Tesla's UV template as a reference
-image, which is what keeps the artwork aligned with the real panels.
-OpenAI-compatible providers receive the layout described in text only.
+The Gemini, OpenRouter and FLUX 2 models receive Tesla's UV template as a
+reference image, which is what keeps the artwork aligned with the real
+panels. The OpenAI-compatible providers receive the layout described in text
+only.
 
 The **Custom OpenAI-compatible** option points the studio at any gateway that
 speaks the OpenAI images API (LiteLLM, a local proxy). Set the base URL and
 the model name in Settings.
+
+### Cloudflare Workers AI (the free one)
+
+Cloudflare gives every account **10,000 free neurons a day**, and no card is
+needed. That is the only way to design a wrap without paying.
+
+Create a token at <https://dash.cloudflare.com/profile/api-tokens> with the
+**Workers AI** permission, then in Settings:
+
+- **API key**: the token
+- **Base URL**: `https://api.cloudflare.com/client/v4/accounts/<account id>/ai/run`
+  (the account id is in the Cloudflare dashboard sidebar)
+- **Model**: `@cf/black-forest-labs/flux-2-dev`
+
+How many wraps a day that buys:
+
+| Model | Neurons per image | Images per day |
+| --- | --- | --- |
+| `@cf/black-forest-labs/flux-2-dev` | about 900 | about 11 |
+| `@cf/black-forest-labs/flux-2-klein-9b` | about 1,500 | about 6 |
+| `@cf/black-forest-labs/flux-1-schnell` | about 173 | about 57 (text only) |
+
+The studio shows the neuron count of every generation, and the allowance
+resets daily. A rejected request never consumes neurons.
+
+#### Cloudflare in the browser build
+
+Cloudflare's AI endpoint answers `405` to the CORS preflight that a browser
+sends before a multipart request with an `Authorization` header. The mobile
+and desktop builds talk to it directly, but the **web build cannot** — the
+request never leaves the browser. The studio says so instead of pretending
+the network is down.
+
+If you need the web build, put a small Worker in front of it and paste the
+Worker URL into the base URL field as `https://<worker>.workers.dev/proxy`.
+The Worker forwards the request and the token, and adds the CORS headers the
+browser needs:
+
+```js
+const cors = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, content-type',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+};
+
+export default {
+  async fetch(request, env) {
+    // The browser sends a preflight before the multipart POST.
+    if (request.method === 'OPTIONS') {
+      return new Response(null, { status: 204, headers: cors });
+    }
+
+    // /proxy/@cf/black-forest-labs/flux-2-dev -> the Cloudflare AI endpoint.
+    const model = new URL(request.url).pathname.replace(/^\/proxy/, '');
+    const target =
+      `https://api.cloudflare.com/client/v4/accounts/${env.ACCOUNT_ID}` +
+      `/ai/run${model}`;
+
+    const upstream = await fetch(target, {
+      method: 'POST',
+      headers: {
+        // The studio already sends the token in this header.
+        Authorization: request.headers.get('authorization') || '',
+        'Content-Type': request.headers.get('content-type') || '',
+      },
+      body: await request.arrayBuffer(),
+    });
+
+    return new Response(upstream.body, {
+      status: upstream.status,
+      headers: {
+        ...cors,
+        'Content-Type':
+          upstream.headers.get('content-type') || 'application/json',
+      },
+    });
+  },
+};
+```
+
+Set `ACCOUNT_ID` as a Worker secret or variable. The key never has to be
+embedded in the Worker: the studio sends it in the `Authorization` header and
+the Worker passes it straight through.
 
 ### OpenRouter
 
@@ -140,9 +227,9 @@ dart run tool/generate_wrap.dart \
 | `--from` | Process an existing image instead of generating one |
 | `--name` / `--out` | Output file name and directory |
 
-The key is read from `GEMINI_API_KEY`, `OPENAI_API_KEY` or
-`OPENROUTER_API_KEY`, depending on the provider. `WRAP_API_KEY` overrides all
-of them.
+The key is read from `GEMINI_API_KEY`, `OPENAI_API_KEY`,
+`OPENROUTER_API_KEY` or `CLOUDFLARE_API_TOKEN`, depending on the provider.
+`WRAP_API_KEY` overrides all of them.
 
 ## Tesla's requirements
 

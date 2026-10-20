@@ -2,9 +2,11 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:http/http.dart' as http;
+import 'package:http_parser/http_parser.dart' show MediaType;
 
 import '../models/ai_provider.dart';
 import '../models/ai_settings.dart';
+import 'platform_support.dart';
 
 /// Raised when a generation request cannot be completed.
 ///
@@ -40,7 +42,35 @@ class GeneratedImage {
   /// the studio show what a generation cost.
   final double? cost;
 
-  const GeneratedImage(this.bytes, this.mimeType, {this.cost});
+  /// The provider's own unit of consumption, when it does not report a
+  /// price. Cloudflare counts "neurons" per generation.
+  final String? units;
+
+  const GeneratedImage(
+    this.bytes,
+    this.mimeType, {
+    this.cost,
+    this.units,
+  });
+}
+
+/// Explains a request that never produced a response.
+///
+/// Cloudflare's AI endpoint answers `405` to the CORS preflight that a browser
+/// sends before a multipart request with an `Authorization` header, so on the
+/// web build the request dies before it leaves the browser. The generic
+/// "check your connection" wording sends people down the wrong path, so the
+/// web build gets the real reason instead.
+///
+/// [isWeb] defaults to the platform the app runs on; tests pass it directly.
+String networkFailureMessage(AiProvider provider, {bool? isWeb}) {
+  final web = isWeb ?? isWebPlatform;
+  if (web && provider.kind == AiProviderKind.cloudflareWorkersAi) {
+    return 'Cloudflare blocks browser requests (CORS). Open the app on '
+        'mobile or desktop, or point the base URL in Settings at a proxy.';
+  }
+  return 'Could not reach ${provider.label}. Check your connection and try '
+      'again.';
 }
 
 /// Talks to text-to-image providers and turns them into wrap textures.
@@ -69,6 +99,8 @@ class AiService {
     Uint8List? referenceImage,
     String referenceMimeType = 'image/png',
     String? aspectRatio,
+    int? width,
+    int? height,
   }) async {
     if (!settings.hasApiKey) {
       throw const AiException(
@@ -102,6 +134,16 @@ class AiService {
           referenceImage: effectiveReference,
           referenceMimeType: referenceMimeType,
           aspectRatio: aspectRatio,
+        );
+      case AiProviderKind.cloudflareWorkersAi:
+        return _generateWithCloudflare(
+          provider: provider,
+          settings: settings,
+          prompt: prompt,
+          referenceImage: effectiveReference,
+          referenceMimeType: referenceMimeType,
+          width: width,
+          height: height,
         );
     }
   }
@@ -153,8 +195,7 @@ class AiService {
           .timeout(requestTimeout);
     } on Exception catch (error) {
       throw AiException(
-        'Could not reach ${provider.label}. Check your connection and try '
-        'again.',
+        _networkFailureMessage(provider),
         detail: error.toString(),
       );
     }
@@ -225,8 +266,7 @@ class AiService {
           .timeout(requestTimeout);
     } on Exception catch (error) {
       throw AiException(
-        'Could not reach ${provider.label}. Check your connection and try '
-        'again.',
+        _networkFailureMessage(provider),
         detail: error.toString(),
       );
     }
@@ -277,6 +317,164 @@ class AiService {
     }
 
     throw const AiException('The provider did not return an image.');
+  }
+
+  /// Generates a wrap through Cloudflare Workers AI.
+  ///
+  /// Cloudflare grants every account a free daily neuron allowance, which
+  /// makes it the only provider here that can produce a wrap without
+  /// paying. The endpoint is
+  /// `POST /accounts/{account id}/ai/run/{model}` and it expects a
+  /// multipart form: the UV template travels as a file, the prompt as a
+  /// field.
+  Future<GeneratedImage> _generateWithCloudflare({
+    required AiProvider provider,
+    required AiSettings settings,
+    required String prompt,
+    Uint8List? referenceImage,
+    String referenceMimeType = 'image/png',
+    int? width,
+    int? height,
+  }) async {
+    final baseUrl = _effectiveBaseUrl(provider, settings);
+    final model = _effectiveModel(provider, settings);
+    final apiKey = settings.apiKey.trim();
+
+    if (baseUrl.contains('YOUR_ACCOUNT_ID')) {
+      throw const AiException(
+        'Set the Cloudflare base URL in Settings to '
+        'https://api.cloudflare.com/client/v4/accounts/<your account id>'
+        '/ai/run',
+      );
+    }
+
+    final uri = Uri.parse('${_stripTrailingSlash(baseUrl)}/$model');
+
+    // Workers AI models disagree on which optional fields they accept, so
+    // the request is retried with a smaller body until one is understood.
+    // A rejected request never consumes neurons.
+    final attempts = <Map<String, String>>[
+      {
+        'prompt': prompt,
+        'num_steps': '4',
+        if (width != null) 'width': '$width',
+        if (height != null) 'height': '$height',
+        'seed': '${DateTime.now().millisecondsSinceEpoch % 100000}',
+      },
+      {
+        'prompt': prompt,
+        'steps': '4',
+      },
+      {
+        'prompt': prompt,
+      },
+    ];
+
+    http.Response? lastResponse;
+    for (final fields in attempts) {
+      lastResponse = await _postCloudflare(
+        uri,
+        apiKey,
+        fields,
+        referenceImage: referenceImage,
+        referenceMimeType: referenceMimeType,
+        provider: provider,
+      );
+      if (lastResponse.statusCode != 400) break;
+    }
+    final response = lastResponse!;
+
+    final decoded = _decodeBody(response.body);
+
+    if (response.statusCode != 200) {
+      throw AiException(
+        _describeProviderError(
+          provider,
+          response.statusCode,
+          decoded,
+          model: model,
+        ),
+        statusCode: response.statusCode,
+        detail: response.body,
+      );
+    }
+
+    final result = decoded?['result'];
+    if (result is! Map) {
+      throw const AiException(
+        'Cloudflare did not return an image. Try rephrasing your description.',
+      );
+    }
+
+    final image = result['image'];
+    if (image is String && image.isNotEmpty) {
+      final neurons = result['usage'] is Map
+          ? (result['usage'] as Map)['neurons']
+          : null;
+      return GeneratedImage(
+        base64Decode(image),
+        'image/jpeg',
+        cost: neurons is num ? neurons / 1000000 : null,
+        units: neurons is num ? neurons.toStringAsFixed(1) : null,
+      );
+    }
+
+    throw const AiException('Cloudflare did not return an image.');
+  }
+
+  Future<http.Response> _postCloudflare(
+    Uri uri,
+    String apiKey,
+    Map<String, String> fields, {
+    Uint8List? referenceImage,
+    String referenceMimeType = 'image/png',
+    required AiProvider provider,
+  }) async {
+    try {
+      final request = http.MultipartRequest('POST', uri);
+      request.headers['Authorization'] = 'Bearer $apiKey';
+      fields.forEach((key, value) => request.fields[key] = value);
+
+      if (referenceImage != null) {
+        request.files.add(
+          http.MultipartFile.fromBytes(
+            'image',
+            referenceImage,
+            filename: 'template.png',
+            contentType: MediaType.parse(referenceMimeType),
+          ),
+        );
+      }
+
+      // The request has to go through the injected client: `Request.send()`
+      // would open its own connection and ignore the timeout.
+      final streamed = await _client.send(request).timeout(requestTimeout);
+      return await http.Response.fromStream(streamed);
+    } on Exception catch (error) {
+      throw AiException(
+        _networkFailureMessage(provider),
+        detail: error.toString(),
+      );
+    }
+  }
+
+  /// Explains a request that never produced a response.
+  ///
+  /// Cloudflare's AI endpoint answers `405` to the CORS preflight that a
+  /// browser sends before a multipart request with an `Authorization` header,
+  /// so on the web build the request dies before it leaves the browser. The
+  /// generic "check your connection" wording sends people down the wrong
+  /// path, so the web build gets the real reason.
+  static String _networkFailureMessage(AiProvider provider) {
+    return networkFailureMessage(provider);
+  }
+
+  static String _stripTrailingSlash(String value) {
+    var result = value.trim();
+    while (result.endsWith('/')) {
+      result = result.substring(0, result.length - 1);
+    }
+    return result;
   }
 
   /// Generates a wrap through OpenRouter's dedicated Image API.
@@ -416,8 +614,7 @@ class AiService {
           .timeout(requestTimeout);
     } on Exception catch (error) {
       throw AiException(
-        'Could not reach ${provider.label}. Check your connection and try '
-        'again.',
+        _networkFailureMessage(provider),
         detail: error.toString(),
       );
     }
@@ -525,9 +722,13 @@ class AiService {
     Map<String, dynamic>? decoded, {
     String? model,
   }) {
-    final error = decoded?['error'];
-    final providerMessage = error is Map ? error['message'] : null;
+    final providerMessage = _extractProviderMessage(decoded);
+    final lower = (providerMessage ?? '').toLowerCase();
 
+    if (lower.contains('daily free allocation')) {
+      return '${provider.label} used up the daily free allowance. It resets '
+          'tomorrow.';
+    }
     if (statusCode == 401 || statusCode == 403) {
       return 'Your API key was rejected by ${provider.label}. Check it in '
           'Settings.';
@@ -545,9 +746,38 @@ class AiService {
       return '${provider.label} rate limited this request. Wait a moment and '
           'try again.';
     }
-    if (providerMessage is String && providerMessage.trim().isNotEmpty) {
+    if (lower.contains('not allowed') || lower.contains('unevaluated')) {
+      return '${provider.label} rejected the request shape for model '
+          '"${model ?? provider.model}". Try another model.';
+    }
+    if (providerMessage != null && providerMessage.trim().isNotEmpty) {
       return '${provider.label}: $providerMessage';
     }
     return '${provider.label} returned an error (HTTP $statusCode).';
+  }
+
+  /// Pulls the human readable message out of a provider error body.
+  ///
+  /// Providers disagree: OpenAI style bodies nest `error.message`, while
+  /// Cloudflare uses an `errors` array.
+  String? _extractProviderMessage(Map<String, dynamic>? decoded) {
+    if (decoded == null) return null;
+
+    final error = decoded['error'];
+    if (error is Map) {
+      final message = error['message'];
+      if (message is String && message.trim().isNotEmpty) return message;
+    }
+
+    final errors = decoded['errors'];
+    if (errors is List && errors.isNotEmpty) {
+      final first = errors.first;
+      if (first is Map) {
+        final message = first['message'];
+        if (message is String && message.trim().isNotEmpty) return message;
+      }
+    }
+
+    return null;
   }
 }
