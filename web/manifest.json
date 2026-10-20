@@ -1,12 +1,12 @@
 {
-    "name": "app",
-    "short_name": "app",
+    "name": "Tesla Wrap Studio",
+    "short_name": "Wrap Studio",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
-    "orientation": "portrait-primary",
+    "background_color": "#0A0A0A",
+    "theme_color": "#0A0A0A",
+    "description": "Design custom Tesla wraps with AI and export print-ready PNGs that fit the vehicle's body panels.",
+    "orientation": "any",
     "prefer_related_applications": false,
     "icons": [
         {
