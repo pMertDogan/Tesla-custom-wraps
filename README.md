@@ -37,9 +37,9 @@ flutter run -d chrome          # or: flutter run -d web-server
 The app is a Flutter **web** app. It also compiles for mobile and desktop,
 the asset layout is platform independent.
 
-Open the studio, pick **Pollinations FLUX** in the provider list and press
-**GENERATE WRAP**: that provider needs no account and no key, so a wrap comes
-out of the box. Every other provider needs its own key in Settings.
+The studio starts on **Pollinations FLUX** and **GENERATE WRAP** draws a wrap
+right away: that provider needs no account and no key. Every other provider
+needs its own key in Settings.
 
 ## AI providers
 
@@ -75,10 +75,9 @@ the model name in Settings.
 
 ### Pollinations (no account, no key)
 
-Pick **Pollinations FLUX** and press **GENERATE WRAP**. That is the whole
-setup: no sign-up, no card, no API key, no account. It is the only provider
-that works the moment the studio opens, and unlike Cloudflare it also works in
-the **web build**, because Pollinations answers with
+Press **GENERATE WRAP**. That is the whole setup: no sign-up, no card, no API
+key, no account. It is the default provider, and unlike Cloudflare it also
+works in the **web build**, because Pollinations answers with
 `Access-Control-Allow-Origin: *`.
 
 There are three things to know about it:

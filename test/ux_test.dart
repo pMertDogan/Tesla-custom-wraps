@@ -4,6 +4,8 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:image/image.dart' as img;
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:tesla_custom_wraps/models/ai_provider.dart';
+import 'package:tesla_custom_wraps/models/ai_settings.dart';
 import 'package:tesla_custom_wraps/screens/studio_page.dart';
 import 'package:tesla_custom_wraps/services/ai_service.dart';
 import 'package:tesla_custom_wraps/services/vehicle_service.dart';
@@ -162,6 +164,120 @@ void main() {
     // dialog, and the design landed in the session history.
     expect(find.text('AI SETTINGS'), findsNothing);
     expect(state.history, hasLength(1));
+  });
+
+  testWidgets('Preview hints and opacity belong to the design view only', (
+    WidgetTester tester,
+  ) async {
+    tester.view.physicalSize = const Size(1920, 1080);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(
+      AppScope(
+        state: AppState(aiService: AiService()),
+        child: MaterialApp(
+          home: StudioPage(vehicle: VehicleService.getVehicles().first),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // The design view tells the user what to do and offers the opacity
+    // control that fades the artwork.
+    expect(find.text('GENERATE A DESIGN TO BEGIN'), findsOneWidget);
+    expect(find.byTooltip('Adjust Opacity'), findsOneWidget);
+
+    // The template view shows Tesla's UV atlas. The hint would cover the
+    // artwork and the opacity slider would do nothing there.
+    await tester.tap(find.widgetWithText(ChoiceChip, 'TEMPLATE'));
+    await tester.pumpAndSettle();
+    expect(find.text('GENERATE A DESIGN TO BEGIN'), findsNothing);
+    expect(find.byTooltip('Adjust Opacity'), findsNothing);
+
+    // The same holds for the reference render of the vehicle.
+    await tester.tap(find.widgetWithText(ChoiceChip, 'VEHICLE'));
+    await tester.pumpAndSettle();
+    expect(find.text('GENERATE A DESIGN TO BEGIN'), findsNothing);
+    expect(find.byTooltip('Adjust Opacity'), findsNothing);
+
+    // The zoom control applies to every view, so it stays.
+    expect(find.byTooltip('Adjust Zoom'), findsOneWidget);
+  });
+
+  testWidgets('Export explains what is missing instead of being disabled', (
+    WidgetTester tester,
+  ) async {
+    tester.view.physicalSize = const Size(1920, 1080);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(
+      AppScope(
+        state: AppState(aiService: AiService()),
+        child: MaterialApp(
+          home: StudioPage(vehicle: VehicleService.getVehicles().first),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final export = find.widgetWithText(ElevatedButton, 'EXPORT WRAP');
+    expect(export, findsOneWidget);
+
+    // The button is live without a design, so it can say what to do next.
+    final button = tester.widget<ElevatedButton>(export);
+    expect(button.onPressed, isNotNull);
+
+    await tester.tap(export);
+    await tester.pump();
+    expect(
+      find.text('Generate a design first, then export it.'),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('Template facts sit above the AI controls in the sidebar', (
+    WidgetTester tester,
+  ) async {
+    tester.view.physicalSize = const Size(1920, 1080);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(
+      AppScope(
+        state: AppState(aiService: AiService()),
+        child: MaterialApp(
+          home: StudioPage(vehicle: VehicleService.getVehicles().first),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // On a short window the bottom of the sidebar scrolls out of view, so the
+    // template size, the mask state and the export rules have to come first.
+    final rules = find.text('Export: PNG, 512-1024 px, max 1 MB');
+    expect(rules, findsOneWidget);
+    expect(
+      tester.getTopLeft(rules).dy,
+      lessThan(tester.getTopLeft(find.text('AI PROVIDER')).dy),
+    );
+  });
+
+  test('the provider that needs no account leads the picker', () {
+    // Fifteen entries hid the only provider that works without an account.
+    expect(AiProviderCatalog.all.first.id, 'pollinations-flux');
+    expect(AiProviderCatalog.all.first.requiresApiKey, isFalse);
+
+    // A fresh install starts on that provider, so the studio can draw a wrap
+    // before the user goes looking for an API key.
+    expect(AiSettings.empty.providerId, 'pollinations-flux');
+    expect(AiSettings.empty.hasApiKey, isFalse);
+    expect(AiProviderCatalog.byId(AiSettings.empty.providerId).id,
+        'pollinations-flux');
   });
 }
 

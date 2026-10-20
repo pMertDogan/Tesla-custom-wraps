@@ -277,7 +277,12 @@ class AiProviderCatalog {
   );
 
   /// Every selectable provider, in menu order.
+  ///
+  /// The keyless provider comes first: it is the only one that works without
+  /// an account, and burying it under fifteen other entries meant nobody
+  /// found it.
   static const List<AiProvider> all = [
+    pollinationsFlux,
     gemini3ProImage,
     geminiNanoBanana21,
     gemini25FlashImage,
@@ -292,7 +297,6 @@ class AiProviderCatalog {
     cloudflareFlux2Klein,
     cloudflareFlux2Klein4b,
     cloudflareFlux1Schnell,
-    pollinationsFlux,
     customOpenAi,
   ];
 

@@ -27,8 +27,11 @@ class AiSettings {
   });
 
   /// Settings with no provider selected and no credentials.
+  ///
+  /// The default provider is the one that needs no account at all, so a fresh
+  /// install can draw a wrap without the user hunting for an API key first.
   static const AiSettings empty = AiSettings(
-    providerId: 'gemini-3-pro-image',
+    providerId: 'pollinations-flux',
     apiKey: '',
   );
 

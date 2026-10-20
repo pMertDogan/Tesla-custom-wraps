@@ -252,7 +252,9 @@ class _StudioPageState extends State<StudioPage> {
               label: 'Export wrap design',
               button: true,
               child: ElevatedButton.icon(
-                onPressed: (_isExporting || _design == null) ? null : _export,
+                // The button stays live without a design so it can explain
+                // what is missing instead of sitting there dead.
+                onPressed: _isExporting ? null : _export,
                 icon: _isExporting
                     ? const SizedBox(
                         height: 16,
@@ -298,6 +300,10 @@ class _StudioPageState extends State<StudioPage> {
       child: ListView(
         padding: const EdgeInsets.all(24),
         children: [
+          // The template facts come first: they describe the canvas the user
+          // designs for and the mask that clips the artwork to it.
+          _buildTemplateInfo(),
+          const SizedBox(height: 20),
           const Text(
             'AI DESIGNER',
             style: TextStyle(
@@ -307,7 +313,7 @@ class _StudioPageState extends State<StudioPage> {
               color: Colors.white,
             ),
           ),
-          const SizedBox(height: 24),
+          const SizedBox(height: 20),
           const Text(
             'AI PROVIDER',
             style: TextStyle(color: Colors.white54, fontSize: 12),
@@ -446,11 +452,14 @@ class _StudioPageState extends State<StudioPage> {
             ),
           ),
           const SizedBox(height: 16),
-          _buildControlSlider(
-            'Opacity',
-            _overlayOpacity,
-            (value) => setState(() => _overlayOpacity = value),
-          ),
+          // Opacity only affects the generated artwork, so it is hidden in
+          // the template and vehicle views instead of sitting there dead.
+          if (_mode == PreviewMode.design)
+            _buildControlSlider(
+              'Opacity',
+              _overlayOpacity,
+              (value) => setState(() => _overlayOpacity = value),
+            ),
           _buildControlSlider(
             'Zoom',
             _zoom,
@@ -460,8 +469,6 @@ class _StudioPageState extends State<StudioPage> {
             divisions: 10,
             semanticLabel: 'Zoom level',
           ),
-          const Divider(height: 40, color: Colors.white10),
-          _buildTemplateInfo(),
         ],
       ),
     );
@@ -540,9 +547,12 @@ class _StudioPageState extends State<StudioPage> {
                   scale: _zoom,
                   child: _buildPreviewImage(),
                 ),
-                if (_design == null)
+                // The hint belongs to the design view only. In the template
+                // and vehicle views it covered the artwork and told the user
+                // to generate something they did not ask to see.
+                if (_design == null && _mode == PreviewMode.design)
                   const Positioned(
-                    top: 40,
+                    bottom: 20,
                     child: Chip(
                       label: Text(
                         'GENERATE A DESIGN TO BEGIN',
