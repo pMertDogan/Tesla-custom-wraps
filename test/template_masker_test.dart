@@ -175,7 +175,7 @@ void main() {
       expect(mask.coverage, greaterThan(0.95));
     });
 
-    test('clips artwork to the panels and whitens the rest', () {
+    test('clips artwork to the panels and keeps the template transparency', () {
       final mask = TemplateMasker.buildMask(_templateWithPanel(64))!;
 
       final artwork = img.Image(width: 64, height: 64);
@@ -188,10 +188,74 @@ void main() {
       // Panel interior keeps the artwork.
       expect(result.getPixel(32, 32).r, 255);
       expect(result.getPixel(32, 32).g, 0);
-      // Everything else is white.
-      expect(result.getPixel(2, 2).r, 255);
-      expect(result.getPixel(2, 2).g, 255);
-      expect(result.getPixel(2, 2).b, 255);
+      // Everything else is empty: no paint and nothing left behind.
+      expect(result.getPixel(2, 2).a, 0);
+      expect(result.getPixel(2, 2).r, 0);
+      expect(result.getPixel(2, 2).g, 0);
+      expect(result.getPixel(2, 2).b, 0);
+    });
+
+    test('carries the alpha channel of the template', () {
+      // The finished wrap has the alpha channel of the template, byte for
+      // byte. Tesla's own example wraps do exactly that.
+      final mask = TemplateMasker.buildMask(_templateWithPanel(64))!;
+
+      final artwork = img.Image(width: 64, height: 64);
+      img.fill(artwork, color: img.ColorRgb8(10, 20, 30));
+
+      final masked = TemplateMasker.applyMask(img.encodePng(artwork), mask)!;
+      final result = img
+          .decodePng(masked)!
+          .convert(format: img.Format.uint8, numChannels: 4);
+      final rgba = result.getBytes(order: img.ChannelOrder.rgba);
+
+      for (var i = 3; i < rgba.length; i += 4) {
+        expect(rgba[i], mask.alpha[(i - 3) ~/ 4]);
+      }
+    });
+
+    test('never paints outside the panels of a real template', () {
+      // The rule Tesla follows: whatever the template leaves empty stays
+      // empty. The Cybertruck has the most empty space of all vehicles.
+      final template = File('cybertruck/template.png');
+      expect(template.existsSync(), isTrue);
+
+      final mask = TemplateMasker.buildMask(template.readAsBytesSync())!;
+
+      final artwork = img.Image(width: 1024, height: 768);
+      img.fill(artwork, color: img.ColorRgb8(255, 128, 0));
+
+      final masked = TemplateMasker.applyMask(img.encodePng(artwork), mask)!;
+      final result = img
+          .decodePng(masked)!
+          .convert(format: img.Format.uint8, numChannels: 4);
+      final rgba = result.getBytes(order: img.ChannelOrder.rgba);
+
+      var outside = 0;
+      for (var i = 3; i < rgba.length; i += 4) {
+        if (mask.alpha[(i - 3) ~/ 4] == 0) {
+          outside++;
+          expect(rgba[i], 0, reason: 'painted outside the panels');
+        }
+      }
+
+      // The template really does have empty space to protect.
+      expect(outside, greaterThan(mask.width * mask.height ~/ 3));
+    });
+
+    test('leaves the artwork it was given untouched', () {
+      // The exporter scales the artwork after masking it, so the masker may
+      // not change the image it was handed.
+      final mask = TemplateMasker.buildMask(_templateWithPanel(64))!;
+
+      final artwork = img.Image(width: 64, height: 64, numChannels: 4);
+      img.fill(artwork, color: img.ColorRgba8(255, 0, 0, 255));
+
+      TemplateMasker.applyMaskToImage(artwork, mask);
+
+      expect(artwork.getPixel(2, 2).a, 255);
+      expect(artwork.getPixel(2, 2).r, 255);
+      expect(artwork.getPixel(2, 2).g, 0);
     });
 
     test('works on the real Tesla templates', () {

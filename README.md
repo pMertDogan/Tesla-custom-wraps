@@ -251,11 +251,11 @@ template ┘   (wrap contract)     (image)       ├─► panel mask ─► exp
 
 - **WrapPromptBuilder** spells out the output contract: a flat 2D texture
   atlas, no car, no background, no text, flat colour, full bleed.
-- **TemplateMasker** derives a panel mask from the template by flooding the
-  white background from the image border. Whatever the flood cannot reach is
-  inside a closed panel outline and therefore paintable.
+- **TemplateMasker** derives the panel layout from the alpha channel of the
+  template. Every pixel the template leaves empty stays empty in the wrap,
+  and the wrap carries the alpha channel of the template, byte for byte.
 - **WrapExporter** crops the design to the template aspect, scales it, applies
-  the mask and shrinks the PNG until it fits the 1 MB budget.
+  the panel layout last and shrinks the PNG until it fits the 1 MB budget.
 
 ## Command line
 
@@ -304,6 +304,12 @@ The exported file obeys all of them:
 | Size | 512 x 512 to 1024 x 1024 px |
 | File size | max 1 MB |
 | File name | max 30 characters, `A-Z a-z 0-9 _ -` and spaces only |
+| Transparency | the alpha channel of the vehicle template |
+
+Tesla's own example wraps carry the alpha channel of their template, byte for
+byte, and they never paint a pixel outside the body panels. The exporter
+reproduces that: the space around and between the panels stays empty, and the
+file is a drop in replacement for the template.
 
 ### Installing the wrap on the car
 

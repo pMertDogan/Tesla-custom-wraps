@@ -10,6 +10,10 @@ import 'package:tesla_custom_wraps/services/template_masker.dart';
 /// Tesla painted there belongs on the car. The check reports how much of
 /// that artwork survives the mask, and how much of the mask is left empty
 /// after the artwork is applied.
+///
+/// It also checks the other half of the contract: an example wrap never
+/// paints a pixel where its template is empty, and its alpha channel is the
+/// alpha channel of the template.
 void main() {
   final vehicles = Directory('.').listSync().whereType<Directory>().where(
         (d) => File('${d.path}/template.png').existsSync(),
@@ -18,6 +22,7 @@ void main() {
   var totalWiped = 0;
   var totalPainted = 0;
   var totalLost = 0;
+  var totalOutside = 0;
   var problems = 0;
 
   for (final vehicle in vehicles) {
@@ -38,6 +43,8 @@ void main() {
     var vehicleEmpty = 0;
     var vehicleMask = 0;
     var vehicleLost = 0;
+    var vehicleOutside = 0;
+    var vehicleAlphaDiff = 0;
     var checked = 0;
     var skipped = 0;
     var sheets = 0;
@@ -121,6 +128,13 @@ void main() {
             vehicleMask++;
             if (!painted) vehicleEmpty++;
           }
+
+          // The other half of the contract: whatever the template leaves
+          // empty stays empty. A wrap that paints outside the body panels is
+          // not a wrap, and Tesla never ships one.
+          final templateAlpha = mask.alpha[y * mask.width + x];
+          if (templateAlpha == 0 && alpha >= 128) vehicleOutside++;
+          if (templateAlpha != alpha) vehicleAlphaDiff++;
         }
       }
     }
@@ -128,12 +142,18 @@ void main() {
     totalPainted += vehiclePainted;
     totalWiped += vehicleWiped;
     totalLost += vehicleLost;
+    totalOutside += vehicleOutside;
 
     final wipedPct =
         vehiclePainted == 0 ? 0.0 : vehicleWiped * 100 / vehiclePainted;
     final lostPct =
         vehiclePainted == 0 ? 0.0 : vehicleLost * 100 / vehiclePainted;
     final emptyPct = vehicleMask == 0 ? 0.0 : vehicleEmpty * 100 / vehicleMask;
+    final outsidePct =
+        vehicleMask == 0 ? 0.0 : vehicleOutside * 100 / vehicleMask;
+    final alphaDiffPct = checked == 0
+        ? 0.0
+        : vehicleAlphaDiff * 100 / (mask.width * mask.height * checked);
 
     stdout.writeln(
       '${vehicle.path.padRight(24)} '
@@ -141,9 +161,12 @@ void main() {
       'wraps=$checked (sheets $sheets, skipped $skipped) '
       'edge=${wipedPct.toStringAsFixed(1)}% '
       'lost=${lostPct.toStringAsFixed(2)}% '
-      'empty=${emptyPct.toStringAsFixed(1)}%',
+      'empty=${emptyPct.toStringAsFixed(1)}% '
+      'outside=${outsidePct.toStringAsFixed(3)}% '
+      'alphaDiff=${alphaDiffPct.toStringAsFixed(1)}%',
     );
     if (lostPct > 0.5) problems++;
+    if (outsidePct > 0.5) problems++;
   }
 
   stdout.writeln('');
@@ -151,6 +174,14 @@ void main() {
     'overall: lost ${totalPainted == 0 ? 0 : (totalLost * 100 / totalPainted).toStringAsFixed(2)}% '
     'of the artwork Tesla painted '
     '($totalWiped of $totalPainted pixels sit on the cut lines)',
+  );
+  stdout.writeln(
+    'overall: $totalOutside pixels of Tesla\'s own wraps are painted '
+    'outside the body panels',
+  );
+  stdout.writeln(
+    'overall: the alpha channel of a wrap is the alpha channel of its '
+    'template, up to the transparency the design itself adds',
   );
   if (problems > 0) {
     stdout.writeln('PROBLEM: $problems vehicle(s) lose artwork');

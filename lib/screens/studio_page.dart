@@ -45,6 +45,7 @@ class _StudioPageState extends State<StudioPage> {
 
   WrapDesign? _design;
   Uint8List? _templateBytes;
+  Uint8List? _rawArtwork;
   PanelMask? _mask;
 
   bool _isGenerating = false;
@@ -122,6 +123,9 @@ class _StudioPageState extends State<StudioPage> {
       if (!mounted) return;
       setState(() {
         _design = design;
+        // The unmasked artwork is kept for the export: the exporter applies
+        // the panel layout itself, on the finished file.
+        _rawArtwork = result.bytes;
         _mode = PreviewMode.design;
       });
       _notify(
@@ -184,10 +188,11 @@ class _StudioPageState extends State<StudioPage> {
     setState(() => _isExporting = true);
     try {
       final wrap = WrapExporter.buildPng(
-        design.bytes,
+        _rawArtwork ?? design.bytes,
         templateWidth: widget.vehicle.templateWidth,
         templateHeight: widget.vehicle.templateHeight,
         fileName: _exportName(),
+        mask: _mask,
       );
       final saved = await WrapSaver.save(wrap);
       if (!mounted) return;
@@ -526,6 +531,11 @@ class _StudioPageState extends State<StudioPage> {
           const SizedBox(height: 4),
           const Text(
             'Export: PNG, 512-1024 px, max 1 MB',
+            style: TextStyle(color: Colors.white38, fontSize: 11),
+          ),
+          const SizedBox(height: 4),
+          const Text(
+            'The export keeps the transparency of the template',
             style: TextStyle(color: Colors.white38, fontSize: 11),
           ),
         ],

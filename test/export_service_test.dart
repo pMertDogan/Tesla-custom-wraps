@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'dart:math';
 import 'dart:typed_data';
 
@@ -180,10 +181,81 @@ void main() {
       // Inside the panel the artwork survives.
       expect(result.getPixel(32, 32).r, 255);
       expect(result.getPixel(32, 32).g, 0);
-      // Outside the panel everything is white.
-      expect(result.getPixel(2, 2).r, 255);
-      expect(result.getPixel(2, 2).g, 255);
-      expect(result.getPixel(2, 2).b, 255);
+      // Outside the panel nothing is painted and nothing is left behind.
+      expect(result.getPixel(2, 2).a, 0);
+      expect(result.getPixel(2, 2).r, 0);
+      expect(result.getPixel(2, 2).g, 0);
+      expect(result.getPixel(2, 2).b, 0);
+    });
+
+    test('exports a masked design exactly like the raw artwork', () {
+      // The gallery keeps the masked design. Exporting it again has to give
+      // the same file, not a second round of masking.
+      final mask = TemplateMasker.buildMask(_templateWithPanel(64))!;
+
+      final artwork = img.Image(width: 64, height: 64);
+      img.fill(artwork, color: img.ColorRgb8(255, 0, 0));
+
+      final raw = WrapExporter.buildPng(
+        img.encodePng(artwork),
+        templateWidth: 64,
+        templateHeight: 64,
+        mask: mask,
+      );
+      final masked = TemplateMasker.applyMask(img.encodePng(artwork), mask)!;
+      final fromMasked = WrapExporter.buildPng(
+        masked,
+        templateWidth: 64,
+        templateHeight: 64,
+        mask: mask,
+      );
+
+      final a = img.decodePng(raw.bytes)!.getBytes(order: img.ChannelOrder.rgba);
+      final b =
+          img.decodePng(fromMasked.bytes)!.getBytes(order: img.ChannelOrder.rgba);
+
+      expect(b.length, a.length);
+      var differing = 0;
+      for (var i = 0; i < a.length; i++) {
+        if (a[i] != b[i]) differing++;
+      }
+      expect(differing, 0);
+    });
+
+    test('carries the alpha channel of the template', () {
+      // Tesla's example wraps are byte for byte identical to the alpha
+      // channel of their template. The export has to do the same, otherwise
+      // the vinyl does not land where the car expects it.
+      final template = File('cybertruck/template.png');
+      expect(template.existsSync(), isTrue);
+
+      final mask = TemplateMasker.buildMask(template.readAsBytesSync())!;
+      final artwork = img.Image(width: 1024, height: 768);
+      img.fill(artwork, color: img.ColorRgb8(20, 140, 220));
+
+      final wrap = WrapExporter.buildPng(
+        img.encodePng(artwork),
+        templateWidth: 1024,
+        templateHeight: 768,
+        mask: mask,
+      );
+
+      final result = img
+          .decodePng(wrap.bytes)!
+          .convert(format: img.Format.uint8, numChannels: 4);
+      final exported = result.getBytes(order: img.ChannelOrder.rgba);
+
+      var mismatched = 0;
+      var paintedOutside = 0;
+      for (var i = 3; i < exported.length; i += 4) {
+        if (exported[i] != mask.alpha[(i - 3) ~/ 4]) mismatched++;
+        if (mask.alpha[(i - 3) ~/ 4] == 0 && exported[i] != 0) {
+          paintedOutside++;
+        }
+      }
+
+      expect(mismatched, 0);
+      expect(paintedOutside, 0);
     });
   });
 

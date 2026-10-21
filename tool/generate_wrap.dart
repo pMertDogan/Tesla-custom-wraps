@@ -118,11 +118,8 @@ Future<void> main(List<String> arguments) async {
       return;
     }
 
-    final masked =
-        mask == null ? cropped : (TemplateMasker.applyMask(cropped, mask) ?? cropped);
-
     final wrap = WrapExporter.buildPng(
-      masked,
+      cropped,
       templateWidth: vehicle.templateWidth,
       templateHeight: vehicle.templateHeight,
       fileName: options['name'] ?? '${vehicle.id}_wrap',
@@ -187,11 +184,8 @@ Future<void> _conformExisting({
     return;
   }
 
-  final masked =
-      mask == null ? cropped : (TemplateMasker.applyMask(cropped, mask) ?? cropped);
-
   final wrap = WrapExporter.buildPng(
-    masked,
+    cropped,
     templateWidth: vehicle.templateWidth,
     templateHeight: vehicle.templateHeight,
     fileName: name ?? '${vehicle.id}_wrap',

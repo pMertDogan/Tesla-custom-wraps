@@ -141,6 +141,10 @@ class WrapExporter {
   /// [mask] when one is given and finally shrunk until it fits the 1 MB
   /// budget.
   ///
+  /// The mask is applied last, on the finished artwork, so the alpha channel
+  /// of the file is the alpha channel of the template. Tesla's own example
+  /// wraps are byte for byte identical to it, and the car expects the same.
+  ///
   /// [templateWidth] and [templateHeight] describe the target UV atlas.
   static ExportedWrap buildPng(
     Uint8List sourceBytes, {
@@ -162,54 +166,68 @@ class WrapExporter {
       targetHeight: templateHeight,
     );
 
+    // The artwork stays opaque while it is scaled. A transparent pixel would
+    // drag the empty space into the panels and leave a dark rim along every
+    // edge of the car.
     var working = img.copyResize(
-      cropped,
+      _flatten(cropped),
       width: templateWidth,
       height: templateHeight,
       interpolation: img.Interpolation.average,
     );
 
-    if (mask != null) {
-      working = TemplateMasker.applyMaskToImage(working, mask);
-    }
-
     var downscaled = false;
-    Uint8List encoded = img.encodePng(working, level: 6);
+    int? quantizedColors;
+
+    Uint8List encode() => img.encodePng(
+          mask == null ? working : TemplateMasker.applyMaskToImage(working, mask),
+          level: 6,
+        );
+
+    var encoded = encode();
     if (encoded.length > maxBytes) {
       downscaled = true;
       for (final step in _downscaleSteps) {
-        if (step >= templateWidth && step >= templateHeight) {
-          // Nothing to gain by going below the template size.
+        final longest = _longestSide(working);
+        final width = (working.width * step / longest).round();
+        final height = (working.height * step / longest).round();
+        if (width < minDimension || height < minDimension) {
+          // Tesla rejects anything smaller than this, so there is nothing to
+          // gain by going further down.
           break;
         }
         working = img.copyResize(
           working,
-          width: (working.width * step / _longestSide(working)).round(),
-          height: (working.height * step / _longestSide(working)).round(),
+          width: width,
+          height: height,
           interpolation: img.Interpolation.average,
         );
-        encoded = img.encodePng(working, level: 6);
+        encoded = encode();
         if (encoded.length <= maxBytes) break;
       }
     }
 
-    int? quantizedColors;
     if (encoded.length > maxBytes) {
       downscaled = true;
       for (final colors in _quantizeSteps) {
-        final quantized = img.quantize(
+        working = img.quantize(
           working,
           numberOfColors: colors,
           method: img.QuantizeMethod.neuralNet,
           dither: img.DitherKernel.none,
         );
-        working = quantized;
-        encoded = img.encodePng(working, level: 6);
+        encoded = encode();
         if (encoded.length <= maxBytes) {
           quantizedColors = colors;
           break;
         }
       }
+    }
+
+    if (encoded.length > maxBytes) {
+      throw const ExportException(
+        'This design is too detailed to fit into 1 MB. Try a simpler pattern.',
+      );
     }
 
     return ExportedWrap(
@@ -219,6 +237,26 @@ class WrapExporter {
       height: working.height,
       downscaled: downscaled,
       quantizedColors: quantizedColors,
+    );
+  }
+
+  /// Removes the transparency of an image.
+  ///
+  /// A wrap is opaque vinyl: only the panel layout of the template decides
+  /// what stays empty. Flattening the artwork first keeps that layout from
+  /// bleeding into the panels while the image is scaled.
+  static img.Image _flatten(img.Image source) {
+    final image = source.convert(numChannels: 4);
+    final rgba = image.getBytes(order: img.ChannelOrder.rgba);
+    for (var i = 3; i < rgba.length; i += 4) {
+      rgba[i] = 255;
+    }
+    return img.Image.fromBytes(
+      width: image.width,
+      height: image.height,
+      bytes: rgba.buffer,
+      bytesOffset: rgba.offsetInBytes,
+      numChannels: 4,
     );
   }
 
