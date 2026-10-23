@@ -355,12 +355,16 @@ typed into the app and sent straight from the browser to the provider.
 
 ### GitHub Pages (what the workflows are set up for)
 
-1. Push to `master` (or run the workflow by hand).
-2. In the repository: **Settings → Pages → Build and deployment → Source:
+1. In the repository: **Settings → Pages → Build and deployment → Source:
    GitHub Actions**.
+2. Push to `master` (or run the workflow by hand).
 3. `.github/workflows/deploy.yml` runs the analyzer, the test suite and the
    release build, then publishes `build/web` to
    `https://<owner>.github.io/<repository>/`.
+
+If Pages is still switched off, the workflow does not fail: it runs the
+checks, attaches the bundle to the run as the `web-build` artifact and leaves
+a warning that points at the setting.
 
 `.github/workflows/ci.yml` does the same work on every pull request. The
 `build-web` job also checks that the bundle is complete and that the
@@ -428,8 +432,9 @@ spending credits.
 | Tesla reference renders and hero art | 4 MB |
 | Tesla example wraps (257 files) | 65 MB, fetched per tile |
 
-The deployed bundle is therefore about 70 MB, and only the images a screen
-actually shows are downloaded: the example gallery loads its tiles on demand.
+That is about 70 MB of assets on top of the engine, and only the images a
+screen actually shows are downloaded: the example gallery loads its tiles on
+demand.
 The 117 MB of GLB vehicle models in
 `assets/models/` are kept in the repository but **not** bundled, because the
 3D preview has not shipped yet. Add `assets/models/` back to `pubspec.yaml`
