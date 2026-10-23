@@ -251,7 +251,7 @@ class GlbMaterialOverride {
     for (final value in weights.values) {
       total += value;
     }
-    if (total == 0) return const [generic.first];
+    if (total == 0) return <int>[generic.first];
 
     generic.sort((a, b) => (weights[b] ?? 0).compareTo(weights[a] ?? 0));
 
