@@ -52,6 +52,12 @@ jobs:
           grep -E '(error|warning) •' analyze.log | head -60 | while IFS= read -r line; do
             echo "::error title=Static analysis::$line"
           done
+          {
+            echo "## Static analysis"
+            echo '```'
+            grep -E '(error|warning) •' analyze.log | head -60
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
           exit $status
 
       - name: Unit and widget tests
@@ -61,10 +67,16 @@ jobs:
           flutter test --reporter expanded > test.log 2>&1
           status=$?
           tail -n 250 test.log
-          grep -E '\[E\]|Expected:|Actual:|Test failed|Exception:' test.log | head -60 |
+          grep -E '\[E\]' test.log | head -40 |
             while IFS= read -r line; do
               echo "::error title=Test failure::$line"
             done
+          {
+            echo "## Test log"
+            echo '```'
+            tail -n 400 test.log
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
           exit $status
 
   build-web:

@@ -343,12 +343,20 @@ class _StudioPageState extends State<StudioPage> {
   }
 
   Future<void> _addTextLayer() async {
+    if (_design == null) {
+      _notify('Generate a design first, then add layers.');
+      return;
+    }
     final layer = await _showTextDialog();
     if (layer == null) return;
     _updateLayers([..._layers, layer]);
   }
 
   Future<void> _addLogoLayer() async {
+    if (_design == null) {
+      _notify('Generate a design first, then add layers.');
+      return;
+    }
     final picked = await pickImage();
     if (!mounted) return;
     if (picked == null) {
@@ -936,8 +944,10 @@ class _StudioPageState extends State<StudioPage> {
       child: Material(
         color: Colors.transparent,
         child: horizontal
-            ? Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            ? SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                child: Row(
                 children: [
                   _buildToolButton(Icons.brush, 'Draw', _toggleDrawing,
                       active: _drawing),
@@ -949,6 +959,7 @@ class _StudioPageState extends State<StudioPage> {
                   _buildToolButton(Icons.redo, 'Redo', _redoLayers,
                       enabled: _redo.isNotEmpty),
                 ],
+                ),
               )
             : Column(
                 children: [
