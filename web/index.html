@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
   <!--
     If you are serving your web app in a path other than the root, change the
@@ -21,9 +21,23 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, viewport-fit=cover">
   <meta name="description" content="Design custom Tesla wraps with AI. Pick a model, describe your design, and export a print-ready PNG that fits the vehicle's body panels.">
   <meta name="theme-color" content="#0A0A0A">
+  <meta name="color-scheme" content="dark">
+  <meta name="referrer" content="strict-origin-when-cross-origin">
+  <meta name="robots" content="index, follow">
+
+  <!-- Open Graph / social preview -->
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Tesla Wrap Studio">
+  <meta property="og:description" content="Describe a wrap, generate it with AI, and export a PNG that fits Tesla's Paint Shop requirements.">
+  <meta property="og:image" content="icons/Icon-512.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Tesla Wrap Studio">
+  <meta name="twitter:description" content="AI-powered Tesla wrap designer with Tesla compliant PNG export.">
+  <meta name="twitter:image" content="icons/Icon-512.png">
 
   <!-- iOS meta tags & icons -->
   <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black">
   <meta name="apple-mobile-web-app-title" content="Tesla Wrap Studio">
   <link rel="apple-touch-icon" href="icons/Icon-192.png">
@@ -33,9 +47,100 @@
 
   <title>Tesla Wrap Studio</title>
   <link rel="manifest" href="manifest.json">
-  <script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/3.1.1/model-viewer.min.js"></script>
+
+  <style>
+    /* Painted before Flutter boots, so a cold load is not a white screen. */
+    html, body {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+      background: #0A0A0A;
+      color: #FFFFFF;
+      font-family: Roboto, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      overflow: hidden;
+    }
+
+    #splash {
+      position: fixed;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 18px;
+      background: radial-gradient(circle at 50% 40%, #1a1a1a 0%, #0A0A0A 70%);
+      z-index: 1;
+    }
+
+    #splash .mark {
+      font-size: 22px;
+      font-weight: 800;
+      letter-spacing: 4px;
+      text-align: center;
+      padding: 0 24px;
+    }
+
+    #splash .mark span {
+      color: #E31937;
+    }
+
+    #splash .bar {
+      width: 168px;
+      height: 3px;
+      border-radius: 2px;
+      overflow: hidden;
+      background: #FFFFFF1A;
+    }
+
+    #splash .bar::after {
+      content: '';
+      display: block;
+      width: 40%;
+      height: 100%;
+      background: #3D7BFF;
+      animation: slide 1.1s ease-in-out infinite;
+    }
+
+    #splash .hint {
+      font-size: 12px;
+      letter-spacing: 0.6px;
+      color: #FFFFFF5C;
+    }
+
+    @keyframes slide {
+      0% { transform: translateX(-110%); }
+      100% { transform: translateX(260%); }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      #splash .bar::after { animation: none; width: 100%; }
+    }
+
+    noscript p {
+      color: #FFFFFFB3;
+      font-size: 14px;
+      line-height: 1.6;
+      max-width: 420px;
+      text-align: center;
+      padding: 0 24px;
+    }
+  </style>
 </head>
 <body>
+  <!-- Shown until Flutter paints its first frame. -->
+  <div id="splash">
+    <div class="mark">TESLA <span>WRAP</span> STUDIO</div>
+    <div class="bar"></div>
+    <div class="hint">Loading the studio...</div>
+  </div>
+
+  <noscript>
+    <p>
+      Tesla Wrap Studio runs entirely in the browser and needs JavaScript.
+      Enable it and reload this page.
+    </p>
+  </noscript>
+
   <!--
     You can customize the "flutter_bootstrap.js" script.
     This is useful to provide a custom configuration to the Flutter loader
@@ -44,6 +149,26 @@
     For more details:
     * https://docs.flutter.dev/platform-integration/web/initialization
   -->
+  <script>
+    // Flutter dispatches this once the first frame is on screen. Removing the
+    // splash there keeps it from flashing behind a transparent first paint.
+    window.addEventListener('flutter-first-frame', function () {
+      var splash = document.getElementById('splash');
+      if (splash) {
+        splash.remove();
+      }
+    });
+
+    // If the engine never boots (no connection, a blocked bundle), the splash
+    // would spin forever. Say something useful after a while instead.
+    window.setTimeout(function () {
+      var hint = document.querySelector('#splash .hint');
+      if (hint && document.getElementById('splash')) {
+        hint.textContent =
+          'Still loading. Check your connection and reload the page.';
+      }
+    }, 20000);
+  </script>
   <script src="flutter_bootstrap.js" async></script>
 </body>
 </html>

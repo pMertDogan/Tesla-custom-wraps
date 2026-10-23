@@ -41,12 +41,27 @@ class StudioPage extends StatefulWidget {
 }
 
 class _StudioPageState extends State<StudioPage> {
+  /// Width at which the studio switches from the three column desktop layout
+  /// to the stacked one used on phones and small tablets.
+  static const double _wideLayoutBreakpoint = 1100;
+
+  /// Width of the prompt sidebar in the desktop layout.
+  static const double _sidebarWidth = 350;
+
   final TextEditingController _promptController = TextEditingController();
 
   WrapDesign? _design;
   Uint8List? _templateBytes;
-  Uint8List? _rawArtwork;
   PanelMask? _mask;
+
+  /// Unmasked provider output for every design in the session, keyed by
+  /// design id.
+  ///
+  /// The exporter applies the panel mask itself, so it needs the artwork as
+  /// the provider returned it. Keeping the bytes per design means picking an
+  /// older design from the history strip exports that design and not the one
+  /// that happened to be generated last.
+  final Map<String, Uint8List> _rawArtwork = <String, Uint8List>{};
 
   bool _isGenerating = false;
   bool _isExporting = false;
@@ -79,8 +94,12 @@ class _StudioPageState extends State<StudioPage> {
         _templateBytes = bytes;
         _mask = mask;
       });
-    } on Exception {
-      // A missing template only costs us the panel mask, the studio still
+    } on Object {
+      // A missing asset throws a `FlutterError`, which is an `Error` and not
+      // an `Exception`. Catching only `Exception` here would leave an
+      // unhandled async error in the zone and take the release build down.
+      //
+      // Losing the template only costs the panel mask; the studio still
       // works with the raw design.
     }
   }
@@ -125,7 +144,7 @@ class _StudioPageState extends State<StudioPage> {
         _design = design;
         // The unmasked artwork is kept for the export: the exporter applies
         // the panel layout itself, on the finished file.
-        _rawArtwork = result.bytes;
+        _rawArtwork[design.id] = result.bytes;
         _mode = PreviewMode.design;
       });
       _notify(
@@ -135,6 +154,14 @@ class _StudioPageState extends State<StudioPage> {
       );
     } on AiException catch (error) {
       _notify(error.message);
+    } on ExportException catch (error) {
+      _notify(error.message);
+    } on Object catch (error) {
+      // Anything the pipeline did not anticipate (a corrupt payload, an
+      // out of memory image) is reported instead of ending up as an
+      // unhandled async error.
+      _notify('The wrap could not be generated. Try again.');
+      debugPrint('Wrap generation failed: $error');
     } finally {
       if (mounted) {
         setState(() => _isGenerating = false);
@@ -187,11 +214,17 @@ class _StudioPageState extends State<StudioPage> {
 
     setState(() => _isExporting = true);
     try {
+      // Cropping, masking and PNG encoding all run on the UI isolate, which
+      // is what Flutter gives you on the web. Yielding once lets the progress
+      // state paint before the work starts, so a 1024 px export does not look
+      // like a frozen page.
+      await Future<void>.delayed(Duration.zero);
+
       final wrap = WrapExporter.buildPng(
-        _rawArtwork ?? design.bytes,
+        _rawArtwork[design.id] ?? design.bytes,
         templateWidth: widget.vehicle.templateWidth,
         templateHeight: widget.vehicle.templateHeight,
-        fileName: _exportName(),
+        fileName: _exportName(design),
         mask: _mask,
       );
       final saved = await WrapSaver.save(wrap);
@@ -203,6 +236,9 @@ class _StudioPageState extends State<StudioPage> {
       );
     } on ExportException catch (error) {
       _notify(error.message);
+    } on Object catch (error) {
+      _notify('The wrap could not be saved. Try again.');
+      debugPrint('Wrap export failed: $error');
     } finally {
       if (mounted) {
         setState(() => _isExporting = false);
@@ -210,8 +246,14 @@ class _StudioPageState extends State<StudioPage> {
     }
   }
 
-  String _exportName() {
-    final prompt = _promptController.text.trim();
+  /// Name Tesla accepts, derived from the prompt that produced [design].
+  ///
+  /// The prompt box may have been edited since the design was made, so the
+  /// design's own prompt wins; the current text is only the fallback.
+  String _exportName(WrapDesign design) {
+    final prompt = design.prompt.trim().isNotEmpty
+        ? design.prompt.trim()
+        : _promptController.text.trim();
     if (prompt.isEmpty) return '${widget.vehicle.id}_wrap';
     return WrapExporter.sanitizeFileName(prompt);
   }
@@ -232,12 +274,19 @@ class _StudioPageState extends State<StudioPage> {
   @override
   Widget build(BuildContext context) {
     final state = AppScope.of(context);
+    final compact = MediaQuery.sizeOf(context).width < 700;
 
     return Scaffold(
       backgroundColor: StudioColors.background,
       appBar: AppBar(
         backgroundColor: Colors.black,
-        title: Text('STUDIO: ${widget.vehicle.name.toUpperCase()}'),
+        title: Text(
+          'STUDIO: ${widget.vehicle.name.toUpperCase()}',
+          overflow: TextOverflow.ellipsis,
+          style: compact
+              ? const TextStyle(fontSize: 14, letterSpacing: 0.5)
+              : null,
+        ),
         actions: [
           Tooltip(
             message: 'Settings',
@@ -250,54 +299,98 @@ class _StudioPageState extends State<StudioPage> {
               ),
             ),
           ),
-          const SizedBox(width: 10),
+          const SizedBox(width: 4),
           Tooltip(
             message: 'Export your design',
             child: Semantics(
               label: 'Export wrap design',
               button: true,
-              child: ElevatedButton.icon(
-                // The button stays live without a design so it can explain
-                // what is missing instead of sitting there dead.
-                onPressed: _isExporting ? null : _export,
-                icon: _isExporting
-                    ? const SizedBox(
-                        height: 16,
-                        width: 16,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: Colors.black,
-                        ),
-                      )
-                    : const Icon(Icons.download),
-                label: const Text('EXPORT WRAP'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.white,
-                  foregroundColor: Colors.black,
-                  disabledBackgroundColor: Colors.white24,
-                  disabledForegroundColor: Colors.black38,
-                ),
-              ),
+              // A phone has no room for the label, so it collapses into the
+              // same icon button the desktop bar uses next to it.
+              child: compact
+                  ? IconButton(
+                      onPressed: _isExporting ? null : _export,
+                      icon: _isExporting
+                          ? const SizedBox(
+                              height: 18,
+                              width: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(Icons.download),
+                    )
+                  : ElevatedButton.icon(
+                      // The button stays live without a design so it can
+                      // explain what is missing instead of sitting there
+                      // dead.
+                      onPressed: _isExporting ? null : _export,
+                      icon: _isExporting
+                          ? const SizedBox(
+                              height: 16,
+                              width: 16,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.black,
+                              ),
+                            )
+                          : const Icon(Icons.download),
+                      label: const Text('EXPORT WRAP'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.white,
+                        foregroundColor: Colors.black,
+                        disabledBackgroundColor: Colors.white24,
+                        disabledForegroundColor: Colors.black38,
+                      ),
+                    ),
             ),
           ),
-          const SizedBox(width: 20),
+          SizedBox(width: compact ? 4 : 20),
         ],
       ),
-      body: Row(
-        children: [
-          _buildSidebar(context, state),
-          Expanded(child: _buildPreviewArea(context, state)),
-          _buildRightSidebar(context),
-        ],
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          // Below the breakpoint the three columns do not fit. The preview
+          // stays on top and the designer moves into a scrollable panel
+          // underneath it, so the studio is usable on a phone without a
+          // single overflowing row.
+          if (constraints.maxWidth < _wideLayoutBreakpoint) {
+            // Give the designer between 240 and 420 pixels, but never at the
+            // cost of the preview: a landscape phone would otherwise leave
+            // the preview a few pixels tall.
+            var designerHeight = constraints.maxHeight * 0.45;
+            if (designerHeight < 240) designerHeight = 240;
+            if (designerHeight > 420) designerHeight = 420;
+            if (designerHeight > constraints.maxHeight - 260) {
+              designerHeight = constraints.maxHeight - 260;
+              if (designerHeight < 160) designerHeight = 160;
+            }
+            return Column(
+              children: [
+                Expanded(child: _buildPreviewArea(context, state)),
+                SizedBox(
+                  height: designerHeight,
+                  child: _buildSidebar(state, width: double.infinity),
+                ),
+              ],
+            );
+          }
+
+          return Row(
+            children: [
+              _buildSidebar(state, width: _sidebarWidth),
+              Expanded(child: _buildPreviewArea(context, state)),
+              if (constraints.maxWidth >= 1280) _buildRightSidebar(context),
+            ],
+          );
+        },
       ),
     );
   }
 
-  Widget _buildSidebar(BuildContext context, AppState state) {
+  Widget _buildSidebar(AppState state, {required double width}) {
     final provider = state.provider;
 
     return Container(
-      width: 350,
+      width: width,
       decoration: const BoxDecoration(
         color: StudioColors.surface,
         border: Border(right: BorderSide(color: Colors.white10)),
@@ -546,37 +639,47 @@ class _StudioPageState extends State<StudioPage> {
   Widget _buildPreviewArea(BuildContext context, AppState state) {
     return Container(
       color: Colors.black,
-      child: Column(
-        children: [
-          _buildModeSwitcher(),
-          Expanded(
-            child: Stack(
-              alignment: Alignment.center,
-              children: [
-                Transform.scale(
-                  scale: _zoom,
-                  child: _buildPreviewImage(),
-                ),
-                // The hint belongs to the design view only. In the template
-                // and vehicle views it covered the artwork and told the user
-                // to generate something they did not ask to see.
-                if (_design == null && _mode == PreviewMode.design)
-                  const Positioned(
-                    bottom: 20,
-                    child: Chip(
-                      label: Text(
-                        'GENERATE A DESIGN TO BEGIN',
-                        style: TextStyle(color: Colors.white70),
-                      ),
-                      backgroundColor: Colors.white12,
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          // On a very short window the history strip and the viewport
+          // controls would push the preview out of the screen. The image
+          // matters more than the furniture around it.
+          final cramped = constraints.maxHeight < 260;
+
+          return Column(
+            children: [
+              _buildModeSwitcher(),
+              Expanded(
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    Transform.scale(
+                      scale: _zoom,
+                      child: _buildPreviewImage(),
                     ),
-                  ),
-              ],
-            ),
-          ),
-          _buildHistoryStrip(state),
-          _buildViewportControls(),
-        ],
+                    // The hint belongs to the design view only. In the
+                    // template and vehicle views it covered the artwork and
+                    // told the user to generate something they did not ask
+                    // to see.
+                    if (_design == null && _mode == PreviewMode.design)
+                      const Positioned(
+                        bottom: 20,
+                        child: Chip(
+                          label: Text(
+                            'GENERATE A DESIGN TO BEGIN',
+                            style: TextStyle(color: Colors.white70),
+                          ),
+                          backgroundColor: Colors.white12,
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+              if (!cramped) _buildHistoryStrip(state),
+              if (!cramped) _buildViewportControls(),
+            ],
+          );
+        },
       ),
     );
   }
@@ -647,7 +750,12 @@ class _StudioPageState extends State<StudioPage> {
   }
 
   Widget _buildHistoryStrip(AppState state) {
-    final designs = state.history;
+    // The session history is shared by every studio tab, so a design made for
+    // another vehicle would preview and export against the wrong template.
+    // Only this vehicle's designs belong in this strip.
+    final designs = state.history
+        .where((design) => design.modelId == widget.vehicle.id)
+        .toList();
     if (designs.isEmpty) return const SizedBox.shrink();
 
     return Container(

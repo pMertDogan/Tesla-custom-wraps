@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="robots" content="noindex">
+  <title>Tesla Wrap Studio</title>
+  <style>
+    html, body {
+      margin: 0;
+      height: 100%;
+      background: #0A0A0A;
+      color: #FFFFFF;
+      font-family: Roboto, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    }
+    main {
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      text-align: center;
+      padding: 0 24px;
+    }
+    p { color: #FFFFFF8C; margin: 0; }
+    a { color: #3D7BFF; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Tesla Wrap Studio</h1>
+    <p>That page does not exist. Taking you back to the studio...</p>
+    <p><a href="./">Open the studio</a></p>
+  </main>
+  <!-- The app has no server side routes, so every unknown path belongs to the
+       index. A relative redirect keeps this working under a sub path. -->
+  <script>
+    window.setTimeout(function () {
+      window.location.replace('./');
+    }, 400);
+  </script>
+</body>
+</html>

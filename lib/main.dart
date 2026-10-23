@@ -1,3 +1,5 @@
+import 'dart:ui' show PlatformDispatcher;
+
 import 'package:flutter/material.dart';
 
 import 'core/theme.dart';
@@ -7,6 +9,19 @@ import 'state/app_scope.dart';
 import 'state/app_state.dart';
 
 void main() {
+  // A release build must not die silently. Framework errors keep their debug
+  // presentation, and an error raised outside the framework (an image that
+  // fails to decode in the background, a storage write that is refused) is
+  // reported instead of taking the whole app down.
+  FlutterError.onError = (details) {
+    FlutterError.presentError(details);
+    debugPrint('Flutter error: ${details.exception}');
+  };
+  PlatformDispatcher.instance.onError = (error, stack) {
+    debugPrint('Uncaught error: $error\n$stack');
+    return true;
+  };
+
   runApp(const TeslaWrapStudioApp());
 }
 
