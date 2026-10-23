@@ -1,9 +1,9 @@
 """Turns a `flutter test --reporter expanded` log into workflow annotations.
 
-GitHub keeps the raw log behind a download, which makes a red check on a pull
-request hard to act on. This script prints one `::error` command per failing
-test with the assertion around it, so the failure shows up on the pull request
-itself.
+GitHub keeps the raw log behind a download, and the log of a large suite is
+mostly progress lines. This script finds each failure, keeps the assertion and
+the line of the test that raised it, and prints it as a workflow command so the
+failure shows up on the pull request itself.
 
     python3 tool/annotate_failures.py test.log
 """
@@ -11,12 +11,61 @@ itself.
 import re
 import sys
 
-# How much of the log around a failure belongs to that failure.
-CONTEXT_BEFORE = 2500
-CONTEXT_AFTER = 400
+# How much of the exception is quoted: enough for "Expected/Actual" plus a
+# stack frame, short enough to stay readable in the annotation panel.
+EXCEPTION_WINDOW = 1200
 
-# A workflow command message is a single line; newlines travel as %0A.
-MAX_MESSAGE = 14000
+# Workflow commands are one line per message; newlines travel as %0A.
+MAX_MESSAGE = 12000
+
+
+def _escape(text):
+    return text.replace("%", "%25").replace("\r", "").replace("\n", "%0A")
+
+
+def failures(log):
+    """One short report per failed test, in the order they appear."""
+    reports = []
+    for match in re.finditer(r"\[E\]", log):
+        error_line = log[log.rfind("\n", 0, match.start()) + 1:match.start() + 3]
+        name = error_line.split(": ", 1)[-1].strip() if ": " in error_line else ""
+
+        window = log[max(0, match.start() - 6000):match.start()]
+        start = window.rfind("EXCEPTION CAUGHT")
+        body = window[start:] if start >= 0 else window
+        # Keep the assertion, not the widget dump above it.
+        for marker in ("The following TestFailure was thrown", "The following"):
+            index = body.find(marker)
+            if index >= 0:
+                body = body[index:]
+                break
+        body = body[:EXCEPTION_WINDOW].strip()
+
+        lines = body.splitlines()
+        location = ""
+        for line in lines:
+            found = re.search(r"file:///\S+_test\.dart:(\d+):(\d+)", line)
+            if found:
+                location = line.strip().lstrip("#").strip()
+                break
+
+        report = name
+        if location:
+            report += "\n  at " + location
+        if body:
+            report += "\n" + body
+        reports.append(report)
+
+    # Dedupe: the same test can be reported twice (progress line + summary).
+    seen = set()
+    unique = []
+    for report in reports:
+        key = report.splitlines()[0]
+        if key in seen:
+            continue
+        seen.add(key)
+        unique.append(report)
+    return unique
 
 
 def main(argv):
@@ -29,16 +78,8 @@ def main(argv):
     except OSError:
         return 0
 
-    blocks = [
-        log[max(0, match.start() - CONTEXT_BEFORE):match.end() + CONTEXT_AFTER]
-        for match in re.finditer(r"\[E\]", log)
-    ]
-    text = "\n\n".join(blocks)[-MAX_MESSAGE:]
-    if not text:
-        return 0
-
-    escaped = text.replace("%", "%25").replace("\r", "").replace("\n", "%0A")
-    print("::error title=Test failures::" + escaped)
+    for report in failures(log):
+        print("::error title=Test failure::" + _escape(report[:MAX_MESSAGE]))
     return 0
 
 
