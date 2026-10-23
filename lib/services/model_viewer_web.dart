@@ -47,7 +47,7 @@ Widget buildModelViewer({
           );
         }
         return HtmlElementView.fromTagName(
-          'model-viewer',
+          tagName: 'model-viewer',
           onElementCreated: (Object element) {
             if (element is JSObject) {
               _attach(element, modelBytes.toJS, 'transparent'.toJS);

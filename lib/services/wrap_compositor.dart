@@ -62,24 +62,32 @@ class WrapCompositor {
     final font = _fontFor(desiredHeight);
     final color = _color(layer.color, layer.opacity);
 
-    // The bitmap fonts are fixed size, so the text is drawn at the nearest
-    // font size and then scaled to the layer's own size.
-    final probe = img.Image(width: 8, height: 8);
-    final textWidth = img.drawString(probe, layer.text, font: font);
-    if (textWidth <= 0) return;
-
-    final glyphs = img.Image(
-      width: textWidth,
-      height: font.lineHeight,
+    // The bitmap fonts are fixed size, so the text is rendered into a scratch
+    // image, trimmed to its ink and then scaled to the layer size. The scratch
+    // width doubles the glyph count to survive long strings.
+    final scratch = img.Image(
+      width: (layer.text.length * font.lineHeight * 2 + 16).clamp(32, 8192),
+      height: font.lineHeight + 4,
       numChannels: 4,
     );
-    img.drawString(glyphs, layer.text, font: font, color: color);
+    img.drawString(scratch, layer.text, font: font, color: color);
 
-    final factor = desiredHeight / font.lineHeight;
+    final box = _inkBox(scratch);
+    if (box == null) return;
+
+    final glyphs = img.copyCrop(
+      scratch,
+      x: box.$1,
+      y: box.$2,
+      width: box.$3,
+      height: box.$4,
+    );
+
+    final factor = desiredHeight / box.$4;
     final target = img.copyResize(
       glyphs,
-      width: (textWidth * factor).round().clamp(1, 8192),
-      height: (font.lineHeight * factor).round().clamp(1, 8192),
+      width: (box.$3 * factor).round().clamp(1, 8192),
+      height: (box.$4 * factor).round().clamp(1, 8192),
       interpolation: img.Interpolation.average,
     );
 
@@ -89,6 +97,29 @@ class WrapCompositor {
       dstX: (layer.x * canvas.width - target.width / 2).round(),
       dstY: (layer.y * canvas.height - target.height / 2).round(),
     );
+  }
+
+  /// Bounding box of the pixels that carry any alpha.
+  ///
+  /// Returns `(x, y, width, height)`, or `null` when nothing was drawn.
+  static (int, int, int, int)? _inkBox(img.Image image) {
+    var left = image.width;
+    var top = image.height;
+    var right = -1;
+    var bottom = -1;
+
+    for (var y = 0; y < image.height; y++) {
+      for (var x = 0; x < image.width; x++) {
+        if (image.getPixel(x, y).a == 0) continue;
+        if (x < left) left = x;
+        if (x > right) right = x;
+        if (y < top) top = y;
+        if (y > bottom) bottom = y;
+      }
+    }
+
+    if (right < left || bottom < top) return null;
+    return (left, top, right - left + 1, bottom - top + 1);
   }
 
   /// Draws an image layer centred on its position.

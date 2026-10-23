@@ -418,7 +418,9 @@ class _StudioPageState extends State<StudioPage> {
       // like a frozen page.
       await Future<void>.delayed(Duration.zero);
 
-      final source = _composedArtwork(design);
+      final source = _composedArtwork(design) ??
+          _rawArtwork[design.id] ??
+          design.bytes;
       final wrap = WrapExporter.buildPng(
         source,
         templateWidth: widget.vehicle.templateWidth,

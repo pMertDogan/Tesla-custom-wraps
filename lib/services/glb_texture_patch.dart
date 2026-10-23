@@ -44,10 +44,51 @@ class GlbMaterialOverride {
     'exterior',
   ];
 
+  /// Material names that are trim rather than paint.
+  ///
+  /// Only used for the models whose materials are all named generically
+  /// (`Material_2125767099`, `black222`, …): there the painted body is the
+  /// largest surface that is not obviously glass, rubber or a light.
+  static const List<String> trimMaterialNames = [
+    'glass',
+    'light',
+    'lamp',
+    'rubber',
+    'tire',
+    'tyre',
+    'wheel',
+    'rim',
+    'brake',
+    'break',
+    'chrome',
+    'mirror',
+    'plate',
+    'brand',
+    'logo',
+    'badge',
+    'interior',
+    'leather',
+    'wood',
+    'seat',
+    'screen',
+    'plastic',
+    'emblem',
+  ];
+
   /// Whether [materialName] looks like the painted body of a car.
   static bool isPaintMaterial(String materialName) {
     final lower = materialName.toLowerCase();
+    if (isTrimMaterial(lower)) return false;
     for (final name in paintMaterialNames) {
+      if (lower.contains(name)) return true;
+    }
+    return false;
+  }
+
+  /// Whether [materialName] names trim that never carries a wrap.
+  static bool isTrimMaterial(String materialName) {
+    final lower = materialName.toLowerCase();
+    for (final name in trimMaterialNames) {
       if (lower.contains(name)) return true;
     }
     return false;
@@ -110,10 +151,11 @@ class GlbMaterialOverride {
       'source': imageIndex,
     });
 
+    final indices = paintMaterialIndices(json);
     var painted = 0;
-    for (final material in materials) {
-      final name = material['name'];
-      if (name is! String || !isPaintMaterial(name)) continue;
+    for (final index in indices) {
+      if (index < 0 || index >= materials.length) continue;
+      final material = materials[index];
 
       final pbr = material.putIfAbsent(
         'pbrMetallicRoughness',
@@ -174,7 +216,89 @@ class GlbMaterialOverride {
     return _Glb.encode(json, bin);
   }
 
-  /// Returns the material names of [glb] that [isPaintMaterial] accepted.
+  /// The material indices that carry the car paint.
+  ///
+  /// Two strategies, in order:
+  ///
+  /// 1. **By name.** The Model 3, the 2021 Model Y and the Cybertruck name
+  ///    their paint (`carpaint`, `Carro_Pintura`, `Bodyl`).
+  /// 2. **By surface.** The 2025 and 2026 Model Y call everything
+  ///    `Material_2125767099`, `black222`, … and have no node names to go by.
+  ///    There the painted body is taken to be the largest surfaces that are
+  ///    not trim, up to roughly a third of the mesh.
+  static List<int> paintMaterialIndices(Map<String, dynamic> json) {
+    final materials = json['materials'];
+    if (materials is! List || materials.isEmpty) return const [];
+
+    final named = <int>[];
+    final generic = <int>[];
+    for (var i = 0; i < materials.length; i++) {
+      final material = materials[i];
+      if (material is! Map) continue;
+      final name = material['name'];
+      if (name is! String) continue;
+      if (isPaintMaterial(name)) {
+        named.add(i);
+      } else if (!isTrimMaterial(name)) {
+        generic.add(i);
+      }
+    }
+    if (named.isNotEmpty) return named;
+    if (generic.isEmpty) return const [];
+
+    final weights = _vertexCountsPerMaterial(json);
+    var total = 0;
+    for (final value in weights.values) {
+      total += value;
+    }
+    if (total == 0) return const [generic.first];
+
+    generic.sort((a, b) => (weights[b] ?? 0).compareTo(weights[a] ?? 0));
+
+    final selected = <int>[];
+    var covered = 0;
+    for (final index in generic) {
+      selected.add(index);
+      covered += weights[index] ?? 0;
+      if (selected.length >= 4 || covered >= total * 0.35) break;
+    }
+    return selected;
+  }
+
+  /// Sum of the position counts of every primitive that uses each material.
+  static Map<int, int> _vertexCountsPerMaterial(Map<String, dynamic> json) {
+    final accessors = json['accessors'];
+    final meshes = json['meshes'];
+    if (accessors is! List || meshes is! List) return const {};
+
+    final counts = <int, int>{};
+    for (final mesh in meshes) {
+      if (mesh is! Map) continue;
+      final primitives = mesh['primitives'];
+      if (primitives is! List) continue;
+
+      for (final primitive in primitives) {
+        if (primitive is! Map) continue;
+        final material = primitive['material'];
+        if (material is! int) continue;
+
+        final attributes = primitive['attributes'];
+        if (attributes is! Map) continue;
+        final position = attributes['POSITION'];
+        if (position is! int || position >= accessors.length) continue;
+
+        final accessor = accessors[position];
+        if (accessor is! Map) continue;
+        final count = accessor['count'];
+        if (count is! int) continue;
+
+        counts[material] = (counts[material] ?? 0) + count;
+      }
+    }
+    return counts;
+  }
+
+  /// Returns the material names that carry the paint.
   ///
   /// Used by the studio to say whether a model can show a wrap at all, and by
   /// the tests to check the five shipped models.
@@ -183,11 +307,13 @@ class GlbMaterialOverride {
     if (parsed == null) return const [];
     final materials = parsed.json['materials'];
     if (materials is! List) return const [];
+
     return [
-      for (final material in materials)
-        if (material is Map && material['name'] is String &&
-            isPaintMaterial(material['name'] as String))
-          material['name'] as String,
+      for (final index in paintMaterialIndices(parsed.json))
+        if (index < materials.length &&
+            materials[index] is Map &&
+            (materials[index] as Map)['name'] is String)
+          (materials[index] as Map)['name'] as String,
     ];
   }
 

@@ -97,7 +97,7 @@ class WrapIdeaGenerator {
   /// The style is used as a hint too: a camo idea starts from the camo
   /// patterns, so the picker and the generated prompt never disagree.
   WrapIdea idea({WrapStyle? style}) {
-    final chosenStyle = style ?? _pick(WrapStyle.presets);
+    final WrapStyle chosenStyle = style ?? _pick<WrapStyle>(WrapStyle.presets);
     final patterns = _patternsFor(chosenStyle);
 
     final parts = <String>[
