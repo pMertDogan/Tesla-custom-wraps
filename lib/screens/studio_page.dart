@@ -1382,14 +1382,22 @@ class _StudioPageState extends State<StudioPage> {
     return Container(
       height: 48,
       color: Colors.white.withAlpha(5),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          _modeChip('DESIGN', PreviewMode.design),
-          _modeChip('TEMPLATE', PreviewMode.template),
-          _modeChip('VEHICLE', PreviewMode.vehicle),
-          _modeChip('3D', PreviewMode.model3d),
-        ],
+      // Four chips do not fit a 420 pixel phone: scroll them rather than
+      // clipping the last one. The row still shrinks to its content, so it
+      // stays centred on a wide window.
+      child: Center(
+        child: SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _modeChip('DESIGN', PreviewMode.design),
+              _modeChip('TEMPLATE', PreviewMode.template),
+              _modeChip('VEHICLE', PreviewMode.vehicle),
+              _modeChip('3D', PreviewMode.model3d),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -1532,18 +1540,23 @@ class _StudioPageState extends State<StudioPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                label,
-                style: const TextStyle(fontSize: 12, color: Colors.white70),
-              ),
-              Text(
-                format(value),
-                style: const TextStyle(fontSize: 12, color: Colors.white),
-              ),
-            ],
+          // The slider below announces both the label and the value. Leaving
+          // these two texts in the semantics tree makes a screen reader say
+          // "Opacity" twice.
+          ExcludeSemantics(
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  label,
+                  style: const TextStyle(fontSize: 12, color: Colors.white70),
+                ),
+                Text(
+                  format(value),
+                  style: const TextStyle(fontSize: 12, color: Colors.white),
+                ),
+              ],
+            ),
           ),
           Tooltip(
             message: 'Adjust $label',
