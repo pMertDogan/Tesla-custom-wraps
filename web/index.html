@@ -170,5 +170,13 @@
     }, 20000);
   </script>
   <script src="flutter_bootstrap.js" async></script>
+
+  <!--
+    Bridge for the 3D preview. It is a few kilobytes; the model-viewer bundle
+    itself and the Draco decoder are downloaded only when the studio opens the
+    3D tab.
+  -->
+  <script src="viewer.js" defer></script>
+  <script src="files.js" defer></script>
 </body>
 </html>

@@ -17,6 +17,10 @@ dependencies:
   http_parser: ^4.0.0
   image: ^4.2.0
   shared_preferences: ^2.3.2
+  # Used by the web build only: the 3D vehicle viewer and the logo picker talk
+  # to the DOM directly. Conditional imports keep it out of the mobile and
+  # desktop builds.
+  web: ^1.0.0
 
 dev_dependencies:
   flutter_test:
@@ -26,10 +30,11 @@ dev_dependencies:
 flutter:
   uses-material-design: true
   assets:
-    # The 3D vehicle models in assets/models/ are deliberately *not* bundled:
-    # the studio has no 3D viewer yet, and shipping 117 MB of GLB files that
-    # nothing loads would dominate the web build. Add the folder back here
-    # together with the preview.
+    # The 3D vehicle models are *not* bundled: the web build serves the
+    # compressed copies from web/models/ (6 MB instead of 117 MB) and the
+    # mobile and desktop builds have no 3D viewer. Keep the originals in
+    # assets/models/ and rebuild the compressed set with
+    # tool/compress_models.sh after changing them.
     # Official Tesla wrap templates and example designs.
     # Layout mirrors teslamotors/custom-wraps: <model>/template.png is the
     # paintable UV atlas, <model>/vehicle_image.png is the reference render

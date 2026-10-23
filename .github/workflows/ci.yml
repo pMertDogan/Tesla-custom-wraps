@@ -80,10 +80,15 @@ jobs:
           du -sh build/web
           test -f build/web/index.html
           test -f build/web/flutter_bootstrap.js
-          # The 117 MB of GLB models are not shipped until the 3D preview
-          # exists; fail loudly if they sneak back into the asset bundle.
+          # The 3D viewer and its decoder are static files shipped next to the
+          # Flutter bundle.
+          test -f build/web/vendor/model-viewer.min.js
+          test -f build/web/vendor/draco/draco_decoder.wasm
+          test -f build/web/models/tesla_m3_model.glb
+          # The 117 MB of original GLB models stay out of the asset bundle;
+          # only the compressed copies in web/models/ are deployed.
           if [ -e build/web/assets/assets/models ]; then
-            echo "Unexpected 3D models in the web bundle" >&2
+            echo "The uncompressed 3D models ended up in the asset bundle" >&2
             exit 1
           fi
 
