@@ -44,8 +44,17 @@ jobs:
       - name: Resolve dependencies
         run: flutter pub get
 
+      # The same check the pull request runs, with the same annotations: a
+      # red deploy on master must say which lint it tripped.
       - name: Static analysis
-        run: flutter analyze
+        run: |
+          set +e
+          flutter analyze > analyze.log 2>&1
+          status=$?
+          grep -E '(error|warning|info) •' analyze.log | head -60 | while IFS= read -r line; do
+            echo "::error title=Static analysis::$line"
+          done
+          exit $status
 
       - name: Unit and widget tests
         run: flutter test --reporter expanded
