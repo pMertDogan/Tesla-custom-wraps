@@ -1602,7 +1602,9 @@ class _VehicleSceneView extends StatefulWidget {
 }
 
 class _VehicleSceneViewState extends State<_VehicleSceneView> {
-  late Future<Uint8List?> _scene = _load();
+  // `late final`: the scene is loaded once per design and never replaced, but
+  // the loader needs `widget`, which a plain field initializer cannot read.
+  late final Future<Uint8List?> _scene = _load();
 
   Future<Uint8List?> _load() async {
     final base = widget.baseArtwork;
