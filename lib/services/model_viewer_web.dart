@@ -49,8 +49,14 @@ Widget buildModelViewer({
         return HtmlElementView.fromTagName(
           tagName: 'model-viewer',
           onElementCreated: (Object element) {
-            if (element is JSObject) {
-              _attach(element, modelBytes.toJS, 'transparent'.toJS);
+            // `is` on a JS interop type is not platform-consistent; `isA`
+            // asks the browser instead.
+            if (element.isA<JSObject>()) {
+              _attach(
+                element as JSObject,
+                modelBytes.toJS,
+                'transparent'.toJS,
+              );
             }
           },
         );
