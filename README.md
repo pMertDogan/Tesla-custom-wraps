@@ -37,6 +37,16 @@ flutter run -d chrome          # or: flutter run -d web-server
 The app is a Flutter **web** app. It also compiles for mobile and desktop,
 the asset layout is platform independent.
 
+A production build is one command:
+
+```bash
+flutter build web --release --base-href /
+# the bundle is in build/web and can be served by any static host
+```
+
+`--base-href` has to match the path the app is served from: `/` for a root
+domain, `/<repository>/` for a GitHub Pages project site.
+
 The studio starts on **Pollinations FLUX** and **GENERATE WRAP** draws a wrap
 right away: that provider needs no account and no key. Every other provider
 needs its own key in Settings.
@@ -72,6 +82,23 @@ only.
 The **Custom OpenAI-compatible** option points the studio at any gateway that
 speaks the OpenAI images API (LiteLLM, a local proxy). Set the base URL and
 the model name in Settings.
+
+### Which providers work in the browser build
+
+The web build calls the providers straight from the browser, so the provider
+has to answer the CORS preflight. This is what that means in practice:
+
+| Provider | Works in the web build | Note |
+| --- | --- | --- |
+| Pollinations | yes | no key, no preflight |
+| Gemini | yes | Google serves the CORS headers |
+| OpenRouter | yes | key in the `Authorization` header |
+| Cloudflare Workers AI | no | `405` on the preflight; use the Worker proxy below |
+| OpenAI, custom gateways | depends on the gateway | `api.openai.com` sends no CORS headers |
+
+The mobile and desktop builds have no such limit because they are not
+browsers. Nothing is proxied by this app: when a provider refuses the browser,
+the studio says so instead of reporting a dead network.
 
 ### Pollinations (no account, no key)
 
@@ -319,6 +346,100 @@ file is a drop in replacement for the template.
   must not contain map or firmware updates.
 - In the car: Toybox → Paint Shop → Wraps
 
+## Deployment
+
+The repository ships three ways to publish the studio. All of them build the
+same release bundle, and all of them are safe to run without a server: there
+is no backend, no database and no secret in the build. The user's API key is
+typed into the app and sent straight from the browser to the provider.
+
+### GitHub Pages (what the workflows are set up for)
+
+1. In the repository: **Settings → Pages → Build and deployment → Source:
+   GitHub Actions**.
+2. Push to `master` (or run the workflow by hand).
+3. `.github/workflows/deploy.yml` runs the analyzer, the test suite and the
+   release build, then publishes `build/web` to
+   `https://<owner>.github.io/<repository>/`.
+
+If Pages is still switched off, the workflow does not fail: it runs the
+checks, attaches the bundle to the run as the `web-build` artifact and leaves
+a warning that points at the setting.
+
+`.github/workflows/ci.yml` does the same work on every pull request. The
+`build-web` job also checks that the bundle is complete and that the
+unused 3D models did not sneak into it.
+
+To publish on a custom domain, add a `web/CNAME` file with the domain, build
+with `--base-href /` and set the domain under **Settings → Pages**.
+
+### Any static host (Netlify, Vercel, S3, Cloudflare Pages)
+
+```bash
+flutter build web --release --base-href /
+```
+
+Upload the contents of `build/web`. The app has no server side routes, but it
+is a single page app, so the host has to answer unknown paths with
+`index.html` (a `200` rewrite). `web/404.html` covers hosts that serve a
+static 404 page instead, like GitHub Pages.
+
+Recommended cache policy:
+
+| Path | Header |
+| --- | --- |
+| `index.html`, `flutter_bootstrap.js`, `flutter_service_worker.js`, `main.dart.js` | `Cache-Control: no-cache` |
+| `canvaskit/*`, `assets/*` (images, fonts) | `Cache-Control: public, max-age=31536000, immutable` |
+
+The JavaScript files keep their names across releases, so they must not be
+cached for long: the entry point and the service worker are what tell the
+browser that a new build exists.
+
+### Docker
+
+```bash
+docker build -t tesla-wrap-studio .
+docker run --rm -p 8080:8080 tesla-wrap-studio
+# http://localhost:8080
+```
+
+`deploy/nginx.conf` serves the bundle with gzip, long lived caching for hashed
+assets, `no-cache` for the entry point, the security headers and the SPA
+fallback. `--build-arg BASE_HREF=/studio/` builds for a sub path, and
+`/healthz` answers the container health check.
+
+### Before a release
+
+```bash
+flutter analyze
+flutter test
+flutter build web --release --base-href /
+```
+
+The test suite is the release gate: it checks the provider catalog against the
+asset folders on disk, the exporter against Tesla's rules (size, name, 1 MB
+budget) and the panel mask against the real templates, including that the
+exported alpha channel is byte for byte the template's. Generation itself is
+never called by the tests, so the suite runs without a key and without
+spending credits.
+
+### What is in the browser bundle
+
+| Content | Size |
+| --- | --- |
+| Flutter engine, CanvasKit | about 2 MB compressed |
+| Tesla templates (12 vehicles) | 1.5 MB |
+| Tesla reference renders and hero art | 4 MB |
+| Tesla example wraps (257 files) | 65 MB, fetched per tile |
+
+That is about 70 MB of assets on top of the engine, and only the images a
+screen actually shows are downloaded: the example gallery loads its tiles on
+demand.
+The 117 MB of GLB vehicle models in
+`assets/models/` are kept in the repository but **not** bundled, because the
+3D preview has not shipped yet. Add `assets/models/` back to `pubspec.yaml`
+together with the viewer.
+
 ## Project structure
 
 ```
@@ -345,6 +466,9 @@ lib/
     app_state.dart              settings and session history
   widgets/
     settings_dialog.dart        provider configuration
+.github/workflows/            CI and GitHub Pages deployment
+deploy/nginx.conf             static hosting config for the Docker image
+Dockerfile                    release image, built on the stable Flutter SDK
 ```
 
 ## Tests
@@ -359,16 +483,19 @@ catalog on disk and the AI service against a mocked HTTP client.
 
 ## Roadmap
 
-- **3D preview** — the GLB vehicle models are already wired into the catalog
-  (`assets/models/`). The studio shows the vehicle reference render for now;
-  the camera controls arrive with the models, so nothing in the interface
-  pretends to rotate a car that is not there yet.
+- **3D preview** — the GLB vehicle models are in the catalog (`assets/models/`)
+  but not in the bundle: the models add 117 MB and nothing draws them yet.
+  The studio shows the vehicle reference render for now; the camera controls
+  arrive with the models, so nothing in the interface pretends to rotate a car
+  that is not there yet.
 - Manual editing tools (draw, text, logo, layers) — the sidebar already
   carries the entry points.
 - Material controls (metallic, roughness) — they belong to the 3D preview.
 
 ## License
 
+The application code in this repository is MIT licensed, see [LICENSE](LICENSE).
+
 The templates and example designs are from
-[`teslamotors/custom-wraps`](https://github.com/teslamotors/custom-wraps).
-The application code in this repository is MIT licensed.
+[`teslamotors/custom-wraps`](https://github.com/teslamotors/custom-wraps) and
+remain subject to Tesla's own terms.

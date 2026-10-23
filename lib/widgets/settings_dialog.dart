@@ -58,6 +58,11 @@ class _SettingsDialogState extends State<SettingsDialog> {
 
   Future<void> _save() async {
     final state = AppScope.read(context);
+    // Grabbed before the await and before the dialog closes: once it is
+    // popped its context is no longer part of the tree, so looking either up
+    // afterwards would throw.
+    final messenger = ScaffoldMessenger.of(context);
+    final navigator = Navigator.of(context);
     final provider = AiProviderCatalog.byId(_providerId);
 
     final settings = AiSettings(
@@ -71,8 +76,8 @@ class _SettingsDialogState extends State<SettingsDialog> {
     await state.updateSettings(settings);
 
     if (!mounted) return;
-    Navigator.of(context).pop();
-    ScaffoldMessenger.of(context).showSnackBar(
+    navigator.pop();
+    messenger.showSnackBar(
       SnackBar(
         content: Text('${provider.label} settings saved.'),
         backgroundColor: const Color(0xFF3D7BFF),

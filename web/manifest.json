@@ -1,12 +1,18 @@
 {
+    "id": "/",
     "name": "Tesla Wrap Studio",
     "short_name": "Wrap Studio",
+    "description": "Design custom Tesla wraps with AI and export print-ready PNGs that fit the vehicle's body panels.",
+    "lang": "en",
+    "dir": "ltr",
     "start_url": ".",
+    "scope": ".",
     "display": "standalone",
+    "display_override": ["window-controls-overlay", "standalone", "browser"],
+    "orientation": "any",
     "background_color": "#0A0A0A",
     "theme_color": "#0A0A0A",
-    "description": "Design custom Tesla wraps with AI and export print-ready PNGs that fit the vehicle's body panels.",
-    "orientation": "any",
+    "categories": ["design", "graphics", "productivity"],
     "prefer_related_applications": false,
     "icons": [
         {

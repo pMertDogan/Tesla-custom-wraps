@@ -14,32 +14,57 @@ class HomePage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final vehicles = VehicleService.getVehicles();
+    // The landing page is the first thing a phone sees: below 640 logical
+    // pixels the labels in the app bar no longer fit next to the title.
+    final compact = MediaQuery.sizeOf(context).width < 640;
 
     return Scaffold(
       backgroundColor: Colors.black,
       appBar: AppBar(
         backgroundColor: Colors.black,
         elevation: 0,
-        title: const Text(
+        title: Text(
           'TESLA WRAP STUDIO',
+          overflow: TextOverflow.ellipsis,
           style: TextStyle(
             color: Colors.white,
             fontWeight: FontWeight.bold,
-            letterSpacing: 2,
+            fontSize: compact ? 16 : null,
+            letterSpacing: compact ? 1 : 2,
           ),
         ),
-        actions: [
-          TextButton(
-            onPressed: () => _openGallery(context),
-            child: const Text('GALLERY', style: TextStyle(color: Colors.white)),
-          ),
-          const SizedBox(width: 10),
-          TextButton(
-            onPressed: () => _openStudio(context, vehicles.first),
-            child: const Text('STUDIO', style: TextStyle(color: Colors.white)),
-          ),
-          const SizedBox(width: 20),
-        ],
+        actions: compact
+            ? [
+                IconButton(
+                  tooltip: 'Gallery',
+                  icon: const Icon(Icons.grid_view, color: Colors.white),
+                  onPressed: () => _openGallery(context),
+                ),
+                IconButton(
+                  tooltip: 'Studio',
+                  icon: const Icon(Icons.brush, color: Colors.white),
+                  onPressed: () => _openStudio(context, vehicles.first),
+                ),
+                const SizedBox(width: 4),
+              ]
+            : [
+                TextButton(
+                  onPressed: () => _openGallery(context),
+                  child: const Text(
+                    'GALLERY',
+                    style: TextStyle(color: Colors.white),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                TextButton(
+                  onPressed: () => _openStudio(context, vehicles.first),
+                  child: const Text(
+                    'STUDIO',
+                    style: TextStyle(color: Colors.white),
+                  ),
+                ),
+                const SizedBox(width: 20),
+              ],
       ),
       body: SingleChildScrollView(
         child: Column(
@@ -85,9 +110,11 @@ class HomePage extends StatelessWidget {
     BuildContext context,
     List<TeslaModel> vehicles,
   ) {
+    final compact = MediaQuery.sizeOf(context).width < 700;
+
     return Container(
       width: double.infinity,
-      height: 600,
+      height: compact ? 520 : 600,
       decoration: const BoxDecoration(
         color: Color(0xFF0F0F0F),
         image: DecorationImage(
@@ -108,85 +135,99 @@ class HomePage extends StatelessWidget {
             ],
           ),
         ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Text(
-              'DESIGN WITHOUT LIMITS',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 60,
-                fontWeight: FontWeight.w900,
-                letterSpacing: 6,
-              ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 24),
-            const Text(
-              'Generate unique Tesla wraps using state-of-the-art AI.',
-              style: TextStyle(
-                color: Colors.white70,
-                fontSize: 22,
-                letterSpacing: 1.2,
-              ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 48),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                ElevatedButton(
-                  onPressed: () {
-                    if (vehicles.isNotEmpty) {
-                      _openStudio(context, vehicles.first);
-                    }
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.white,
-                    foregroundColor: Colors.black,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 48,
-                      vertical: 24,
-                    ),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                  ),
-                  child: const Text(
-                    'GET STARTED',
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
-                  ),
+        child: Padding(
+          padding: EdgeInsets.symmetric(horizontal: compact ? 20 : 40),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(
+                'DESIGN WITHOUT LIMITS',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: compact ? 32 : 60,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: compact ? 1.5 : 6,
                 ),
-                const SizedBox(width: 24),
-                OutlinedButton(
-                  onPressed: () => _openGallery(context),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: Colors.white,
-                    side: const BorderSide(color: Colors.white, width: 2),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 48,
-                      vertical: 24,
-                    ),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                  ),
-                  child: const Text(
-                    'VIEW GALLERY',
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
-                  ),
+                textAlign: TextAlign.center,
+              ),
+              SizedBox(height: compact ? 16 : 24),
+              Text(
+                'Generate unique Tesla wraps using state-of-the-art AI.',
+                style: TextStyle(
+                  color: Colors.white70,
+                  fontSize: compact ? 15 : 22,
+                  letterSpacing: compact ? 0.4 : 1.2,
                 ),
-              ],
-            ),
-          ],
+                textAlign: TextAlign.center,
+              ),
+              SizedBox(height: compact ? 28 : 48),
+              // A `Row` overflows as soon as the two buttons no longer fit
+              // side by side; `Wrap` moves the second one to its own line.
+              Wrap(
+                alignment: WrapAlignment.center,
+                spacing: 24,
+                runSpacing: 16,
+                children: [
+                  ElevatedButton(
+                    onPressed: () {
+                      if (vehicles.isNotEmpty) {
+                        _openStudio(context, vehicles.first);
+                      }
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.white,
+                      foregroundColor: Colors.black,
+                      padding: EdgeInsets.symmetric(
+                        horizontal: compact ? 32 : 48,
+                        vertical: compact ? 18 : 24,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                    ),
+                    child: Text(
+                      'GET STARTED',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: compact ? 15 : 18,
+                      ),
+                    ),
+                  ),
+                  OutlinedButton(
+                    onPressed: () => _openGallery(context),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: Colors.white,
+                      side: const BorderSide(color: Colors.white, width: 2),
+                      padding: EdgeInsets.symmetric(
+                        horizontal: compact ? 32 : 48,
+                        vertical: compact ? 18 : 24,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                    ),
+                    child: Text(
+                      'VIEW GALLERY',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: compact ? 15 : 18,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
 
   Widget _buildModelSelection(BuildContext context, List<TeslaModel> vehicles) {
+    final compact = MediaQuery.sizeOf(context).width < 700;
+
     return SizedBox(
-      height: 520,
+      height: compact ? 440 : 520,
       child: ListView.builder(
         padding: const EdgeInsets.symmetric(horizontal: 24),
         scrollDirection: Axis.horizontal,
@@ -194,7 +235,7 @@ class HomePage extends StatelessWidget {
         itemBuilder: (context, index) {
           final vehicle = vehicles[index];
           return Container(
-            width: 400,
+            width: compact ? 300 : 400,
             margin: const EdgeInsets.all(8),
             decoration: BoxDecoration(
               color: const Color(0xFF121212),
@@ -287,13 +328,16 @@ class HomePage extends StatelessWidget {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text(
-                'COMMUNITY GALLERY',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 28,
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: 2,
+              const Flexible(
+                child: Text(
+                  'COMMUNITY GALLERY',
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 28,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 2,
+                  ),
                 ),
               ),
               TextButton(
@@ -305,71 +349,84 @@ class HomePage extends StatelessWidget {
         ),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 32),
-          child: GridView.builder(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 4,
-              crossAxisSpacing: 24,
-              mainAxisSpacing: 24,
-              childAspectRatio: 1.0,
-            ),
-            itemCount: galleryImages.length,
-            itemBuilder: (context, index) {
-              return ClipRRect(
-                borderRadius: BorderRadius.circular(12),
-                child: Stack(
-                  fit: StackFit.expand,
-                  children: [
-                    Image.asset(galleryImages[index], fit: BoxFit.cover),
-                    Container(
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: Alignment.bottomCenter,
-                          end: Alignment.topCenter,
-                          colors: [
-                            Colors.black.withAlpha(153),
-                            Colors.transparent,
-                          ],
-                        ),
-                      ),
-                    ),
-                    Positioned(
-                      bottom: 4,
-                      left: 4,
-                      child: Tooltip(
-                        message: 'Like this design',
-                        child: Semantics(
-                          label: 'Like design',
-                          button: true,
-                          child: IconButton(
-                            icon: const Icon(
-                              Icons.favorite_border,
-                              color: Colors.white70,
-                            ),
-                            onPressed: () {
-                              ScaffoldMessenger.of(context)
-                                ..hideCurrentSnackBar()
-                                ..showSnackBar(
-                                  const SnackBar(
-                                    content: Text('Added to your favorites!'),
-                                    duration: Duration(seconds: 2),
-                                    behavior: SnackBarBehavior.floating,
-                                    width: 250,
-                                  ),
-                                );
-                            },
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              // Four tiles across on a desktop, two on a phone. A fixed
+              // count squeezes the tiles into unreadable slivers on narrow
+              // screens.
+              final width = constraints.maxWidth;
+              final columns = width >= 1040 ? 4 : (width >= 520 ? 3 : 2);
+
+              return GridView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: columns,
+                  crossAxisSpacing: 24,
+                  mainAxisSpacing: 24,
+                  childAspectRatio: 1,
                 ),
+                itemCount: galleryImages.length,
+                itemBuilder: (context, index) =>
+                    _buildGalleryTile(context, galleryImages[index]),
               );
             },
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildGalleryTile(BuildContext context, String assetPath) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(12),
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          Image.asset(assetPath, fit: BoxFit.cover),
+          Container(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.bottomCenter,
+                end: Alignment.topCenter,
+                colors: [
+                  Colors.black.withAlpha(153),
+                  Colors.transparent,
+                ],
+              ),
+            ),
+          ),
+          Positioned(
+            bottom: 4,
+            left: 4,
+            child: Tooltip(
+              message: 'Like this design',
+              child: Semantics(
+                label: 'Like design',
+                button: true,
+                child: IconButton(
+                  icon: const Icon(
+                    Icons.favorite_border,
+                    color: Colors.white70,
+                  ),
+                  onPressed: () {
+                    ScaffoldMessenger.of(context)
+                      ..hideCurrentSnackBar()
+                      ..showSnackBar(
+                        const SnackBar(
+                          content: Text('Added to your favorites!'),
+                          duration: Duration(seconds: 2),
+                          behavior: SnackBarBehavior.floating,
+                          width: 250,
+                        ),
+                      );
+                  },
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

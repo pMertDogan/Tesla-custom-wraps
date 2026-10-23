@@ -25,3 +25,6 @@ final_*.png
 
 # OS
 Thumbs.db
+
+# Test artifacts
+coverage/

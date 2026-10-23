@@ -41,8 +41,17 @@ class AppState extends ChangeNotifier {
   List<WrapDesign> get history => List.unmodifiable(_history);
 
   /// Loads the persisted settings. Call once during startup.
+  ///
+  /// Storage can be unavailable (private browsing, a blocked local storage
+  /// quota), and a first run has nothing stored yet. Neither is a reason to
+  /// keep the studio from opening, so the defaults stay in place and the
+  /// failure only costs the previously saved settings.
   Future<void> load() async {
-    _settings = await _settingsService.load();
+    try {
+      _settings = await _settingsService.load();
+    } on Object catch (error) {
+      debugPrint('Could not load the saved settings: $error');
+    }
     notifyListeners();
   }
 
@@ -50,7 +59,13 @@ class AppState extends ChangeNotifier {
   Future<void> updateSettings(AiSettings settings) async {
     _settings = settings;
     notifyListeners();
-    await _settingsService.save(settings);
+    try {
+      await _settingsService.save(settings);
+    } on Object catch (error) {
+      // The settings are live for this session either way; only persistence
+      // failed.
+      debugPrint('Could not save the settings: $error');
+    }
   }
 
   /// Adds a generated design to the session history.

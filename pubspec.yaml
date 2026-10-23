@@ -16,7 +16,6 @@ dependencies:
   http: ^1.2.2
   http_parser: ^4.0.0
   image: ^4.2.0
-  model_viewer_plus: ^1.10.0
   shared_preferences: ^2.3.2
 
 dev_dependencies:
@@ -27,9 +26,10 @@ dev_dependencies:
 flutter:
   uses-material-design: true
   assets:
-    # App-specific 3D vehicle models (GLB).
-    - assets/models/
-
+    # The 3D vehicle models in assets/models/ are deliberately *not* bundled:
+    # the studio has no 3D viewer yet, and shipping 117 MB of GLB files that
+    # nothing loads would dominate the web build. Add the folder back here
+    # together with the preview.
     # Official Tesla wrap templates and example designs.
     # Layout mirrors teslamotors/custom-wraps: <model>/template.png is the
     # paintable UV atlas, <model>/vehicle_image.png is the reference render

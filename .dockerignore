@@ -1,0 +1,15 @@
+# Keep the build context small: the image only needs the source, the pubspec
+# and the Tesla assets.
+.git
+.github
+.idea
+.vscode
+build
+.dart_tool
+.flutter-plugins
+.flutter-plugins-dependencies
+node_modules
+coverage
+*.log
+README.md
+Dockerfile

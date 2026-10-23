@@ -1,0 +1,96 @@
+name: CI
+
+# Runs on every pull request and on the branches that can be deployed, so a
+# broken build never reaches a release.
+on:
+  push:
+    branches:
+      - master
+      - main
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  analyze-and-test:
+    name: Analyze and test
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v4
+
+      - name: Install Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Print the toolchain versions
+        run: |
+          flutter --version
+          dart --version
+
+      - name: Resolve dependencies
+        run: flutter pub get
+
+      - name: Static analysis
+        run: flutter analyze
+
+      - name: Unit and widget tests
+        run: flutter test --reporter expanded
+
+  build-web:
+    name: Build the web bundle
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    needs: analyze-and-test
+
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v4
+
+      - name: Install Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Resolve dependencies
+        run: flutter pub get
+
+      - name: Build
+        # The base href has to match the path the app is served from. GitHub
+        # Pages serves a project site under /<repository>/, so that is the
+        # default here; pass --base-href "/" for a root domain deployment.
+        run: |
+          flutter build web \
+            --release \
+            --base-href "/${GITHUB_REPOSITORY#*/}/"
+
+      - name: Check the bundle
+        run: |
+          du -sh build/web
+          test -f build/web/index.html
+          test -f build/web/flutter_bootstrap.js
+          # The 117 MB of GLB models are not shipped until the 3D preview
+          # exists; fail loudly if they sneak back into the asset bundle.
+          if [ -e build/web/assets/assets/models ]; then
+            echo "Unexpected 3D models in the web bundle" >&2
+            exit 1
+          fi
+
+      - name: Upload the bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-build
+          path: build/web
+          retention-days: 7
+          if-no-files-found: error
