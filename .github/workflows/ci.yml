@@ -42,10 +42,30 @@ jobs:
         run: flutter pub get
 
       - name: Static analysis
-        run: flutter analyze
+        # The log is annotated line by line: a red X on the pull request then
+        # says what broke without anyone having to open the raw log.
+        run: |
+          set +e
+          flutter analyze --no-fatal-infos > analyze.log 2>&1
+          status=$?
+          cat analyze.log
+          grep -E '(error|warning) •' analyze.log | head -60 | while IFS= read -r line; do
+            echo "::error title=Static analysis::$line"
+          done
+          exit $status
 
       - name: Unit and widget tests
-        run: flutter test --reporter expanded
+        if: always()
+        run: |
+          set +e
+          flutter test --reporter expanded > test.log 2>&1
+          status=$?
+          tail -n 250 test.log
+          grep -E '\[E\]|Expected:|Actual:|Test failed|Exception:' test.log | head -60 |
+            while IFS= read -r line; do
+              echo "::error title=Test failure::$line"
+            done
+          exit $status
 
   build-web:
     name: Build the web bundle
