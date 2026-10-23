@@ -71,12 +71,9 @@ jobs:
             while IFS= read -r line; do
               echo "::error title=Test failure::$line"
             done
-          {
-            echo "## Test log"
-            echo '```'
-            tail -n 400 test.log
-            echo '```'
-          } >> "$GITHUB_STEP_SUMMARY"
+          # One annotation per failing test, with the message around it: the
+          # expanded reporter prints the expectation above the line.
+          python3 tool/annotate_failures.py test.log || true
           exit $status
 
   build-web:
