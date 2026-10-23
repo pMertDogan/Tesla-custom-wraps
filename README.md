@@ -13,13 +13,20 @@ templates.
 
 1. **Pick a vehicle** — all 12 models Tesla publishes a wrap template for
    (Cybertruck, Model 3, Model S, Model X, Model Y and their trims).
-2. **Describe the design** — a free text prompt plus a style preset
-   (digital camo, gradient mesh, retro stripes, pixel art, …).
+2. **Describe the design — or don't** — a free text prompt plus a style preset
+   (digital camo, gradient mesh, retro stripes, pixel art, …). Leave the box
+   empty and the studio invents a concept for the selected style; **SURPRISE
+   ME** picks a random style *and* concept and generates straight away.
 3. **Generate** — the app sends the prompt *and* Tesla's UV template to the AI
    provider, so the artwork lands on the right panels.
 4. **Clip to the panels** — the result is masked against the template so the
    body panels carry the artwork and the shut lines stay clean.
-5. **Export** — a PNG that satisfies every requirement of Tesla's Paint Shop.
+5. **Edit** — text, logo and freehand brush layers on top of the generated
+   artwork, with undo/redo, visibility and opacity per layer.
+6. **Preview in 3D** — the vehicle model with the wrap on its body, rotatable
+   and zoomable.
+7. **Export** — a PNG that satisfies every requirement of Tesla's Paint Shop,
+   layer stack included.
 
 ## Requirements
 
@@ -50,6 +57,63 @@ domain, `/<repository>/` for a GitHub Pages project site.
 The studio starts on **Pollinations FLUX** and **GENERATE WRAP** draws a wrap
 right away: that provider needs no account and no key. Every other provider
 needs its own key in Settings.
+
+## Designing without a prompt
+
+The prompt is optional. There are three ways to get a design without writing
+one:
+
+- **Generate with an empty prompt.** The studio invents a concept for the
+  selected style — a colour story, a pattern and a finish, for example
+  *"midnight navy with electric cyan accents, circuit board traces and solder
+  points, satin sheen"* — and shows it in the prompt box so it can be edited
+  and reused.
+- **SURPRISE ME** picks a random style and a random concept, then generates.
+- **The idea chips** under the prompt box offer a concept per style; tapping
+  one fills the box without spending a generation.
+
+Concepts come from `lib/services/wrap_ideas.dart`, which only combines colours,
+patterns and finishes. It never mentions a vehicle, because naming one makes an
+image model draw a car instead of a wrap.
+
+## Editing layers
+
+The tool rail on the right (or under the preview on a phone) holds four real
+tools:
+
+| Tool | What it does |
+| --- | --- |
+| **Draw** | Paint freehand on the wrap. Pick the colour and the brush size in the strip that appears; tap Draw again to stop. |
+| **Text** | Add a text layer with colour and size. |
+| **Logo** | Pick a PNG/JPEG/WebP/GIF from disk and place it on the wrap. |
+| **Layers** | Reorder, hide, fade or delete layers. |
+
+Undo and redo cover every change. The stack is stored per design
+(`SharedPreferences`, capped at 1 MB per logo and 12 designs) and is baked into
+the pixels at export time by `WrapCompositor`, so the preview, the 3D model and
+the exported file always show the same wrap.
+
+## 3D preview
+
+The **3D** tab shows the vehicle model with the current design on its body.
+
+- The models live in `web/models/` and are 6.3 MB together, down from 117 MB:
+  Draco geometry, WebP textures, a 0.5 simplify ratio and quantised attributes.
+  `tool/compress_models.sh` rebuilds them from `assets/models/`.
+- The preview runs in the browser build only. It uses the
+  `<model-viewer>` element, which is downloaded when the 3D tab is opened
+  together with its Draco decoder (`web/vendor/`), so neither the home page nor
+  the 2D studio pays for it.
+- The wrap is written into the model's paint material at run time
+  (`GlbMaterialOverride`): a texture is appended to the GLB, and every material
+  whose name marks car paint (`carpaint`, `Carro_Pintura`, `Bodyl`, …) points at
+  it. Glass, tyres, lights and chrome keep their own materials.
+- Tesla's UV atlas and the models' own UV sets are unrelated, so the texture is
+  a tiled preview of the design rather than an exact panel placement. The
+  exported PNG remains the authoritative atlas, and the studio says as much in
+  the tab.
+- 9 of the 12 vehicles have a model; Model S, Model X and the Cybertruck
+  variants without one show the reference render.
 
 ## AI providers
 
@@ -428,6 +492,8 @@ spending credits.
 | Content | Size |
 | --- | --- |
 | Flutter engine, CanvasKit | about 2 MB compressed |
+| 3D models (5 files, fetched on demand) | 6.3 MB |
+| model-viewer + Draco decoder (on demand) | 1.8 MB |
 | Tesla templates (12 vehicles) | 1.5 MB |
 | Tesla reference renders and hero art | 4 MB |
 | Tesla example wraps (257 files) | 65 MB, fetched per tile |
@@ -435,10 +501,9 @@ spending credits.
 That is about 70 MB of assets on top of the engine, and only the images a
 screen actually shows are downloaded: the example gallery loads its tiles on
 demand.
-The 117 MB of GLB vehicle models in
-`assets/models/` are kept in the repository but **not** bundled, because the
-3D preview has not shipped yet. Add `assets/models/` back to `pubspec.yaml`
-together with the viewer.
+The 117 MB of original GLB models in `assets/models/` stay out of the bundle;
+the compressed copies in `web/models/` are served as static files and fetched
+only when the 3D tab opens.
 
 ## Project structure
 
@@ -456,6 +521,12 @@ lib/
     studio_page.dart            the design screen
   services/
     ai_service.dart             real provider calls
+    glb_texture_patch.dart      writes a wrap texture into a GLB
+    image_source.dart           platform image picker (web + stub)
+    layer_store.dart            layer persistence
+    vehicle_viewer.dart         3D scene loading and the viewer widget
+    wrap_compositor.dart        text/logo/brush rendering
+    wrap_ideas.dart             prompt-free concept generator
     export_service.dart         Tesla compliant PNG export
     prompt_builder.dart         prompt contract and style presets
     settings_service.dart       persistence
@@ -483,14 +554,10 @@ catalog on disk and the AI service against a mocked HTTP client.
 
 ## Roadmap
 
-- **3D preview** — the GLB vehicle models are in the catalog (`assets/models/`)
-  but not in the bundle: the models add 117 MB and nothing draws them yet.
-  The studio shows the vehicle reference render for now; the camera controls
-  arrive with the models, so nothing in the interface pretends to rotate a car
-  that is not there yet.
-- Manual editing tools (draw, text, logo, layers) — the sidebar already
-  carries the entry points.
-- Material controls (metallic, roughness) — they belong to the 3D preview.
+- Material controls (metallic, roughness, gloss) on the 3D preview.
+- Exact 3D placement: mapping Tesla's UV atlas onto the models needs a
+  per-vehicle UV remap, since their own UV sets are unrelated to the atlas.
+- 3D models for the vehicles Tesla publishes a template for but no model.
 
 ## License
 

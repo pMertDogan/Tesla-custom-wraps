@@ -14,7 +14,7 @@ class VehicleService {
       name: 'Cybertruck',
       description: 'Futuristic design, built for any planet.',
       folder: 'cybertruck',
-      glbPath: 'assets/models/tesla_cybertruck.glb',
+      glbPath: 'models/tesla_cybertruck.glb',
       templateWidth: 1024,
       templateHeight: 768,
       exampleNames: [
@@ -61,7 +61,7 @@ class VehicleService {
       name: 'Model 3',
       description: 'The best-selling electric sedan.',
       folder: 'model3',
-      glbPath: 'assets/models/tesla_m3_model.glb',
+      glbPath: 'models/tesla_m3_model.glb',
       templateWidth: 1024,
       templateHeight: 1024,
       exampleNames: [
@@ -92,6 +92,7 @@ class VehicleService {
       name: 'Model 3 (2024+) Standard',
       description: 'Refreshed Model 3 in Standard and Premium trim.',
       folder: 'model3-2024-base',
+      glbPath: 'models/tesla_m3_model.glb',
       templateWidth: 1024,
       templateHeight: 1024,
       exampleNames: [
@@ -122,6 +123,7 @@ class VehicleService {
       name: 'Model 3 (2024+) Performance',
       description: 'Refreshed Model 3 Performance.',
       folder: 'model3-2024-performance',
+      glbPath: 'models/tesla_m3_model.glb',
       templateWidth: 1024,
       templateHeight: 1024,
       exampleNames: [
@@ -243,7 +245,7 @@ class VehicleService {
       name: 'Model Y',
       description: 'Versatile electric SUV.',
       folder: 'modely',
-      glbPath: 'assets/models/2025_tesla_model_y.glb',
+      glbPath: 'models/2021_tesla_model_y.glb',
       templateWidth: 1024,
       templateHeight: 1024,
       exampleNames: [
@@ -274,7 +276,7 @@ class VehicleService {
       name: 'Model Y (2025+) Standard',
       description: 'Refreshed Model Y in Standard trim.',
       folder: 'modely-2025-base',
-      glbPath: 'assets/models/2025_tesla_model_y.glb',
+      glbPath: 'models/2025_tesla_model_y.glb',
       templateWidth: 1024,
       templateHeight: 1024,
       exampleNames: [
@@ -305,7 +307,7 @@ class VehicleService {
       name: 'Model Y (2025+) Performance',
       description: 'Refreshed Model Y Performance.',
       folder: 'modely-2025-performance',
-      glbPath: 'assets/models/2026_tesla_model_y_performance.glb',
+      glbPath: 'models/2026_tesla_model_y_performance.glb',
       templateWidth: 1024,
       templateHeight: 1024,
       exampleNames: [
@@ -336,7 +338,7 @@ class VehicleService {
       name: 'Model Y (2025+) Premium',
       description: 'Refreshed Model Y in Premium trim.',
       folder: 'modely-2025-premium',
-      glbPath: 'assets/models/2025_tesla_model_y.glb',
+      glbPath: 'models/2025_tesla_model_y.glb',
       templateWidth: 1024,
       templateHeight: 1024,
       exampleNames: [
@@ -367,6 +369,7 @@ class VehicleService {
       name: 'Model Y L',
       description: 'Long wheelbase Model Y.',
       folder: 'modely-l',
+      glbPath: 'models/2025_tesla_model_y.glb',
       templateWidth: 1024,
       templateHeight: 1024,
       exampleNames: [

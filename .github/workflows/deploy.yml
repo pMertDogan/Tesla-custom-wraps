@@ -55,6 +55,8 @@ jobs:
           flutter build web \
             --release \
             --base-href "/${GITHUB_REPOSITORY#*/}/"
+          test -f build/web/models/tesla_m3_model.glb
+          test -f build/web/vendor/model-viewer.min.js
 
       - name: Check whether Pages is enabled
         id: pages
