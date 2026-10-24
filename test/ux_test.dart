@@ -166,7 +166,7 @@ void main() {
     expect(state.history, hasLength(1));
   });
 
-  testWidgets('Preview hints and opacity belong to the design view only', (
+  testWidgets('The preview offers the design and the 3D car, nothing else', (
     WidgetTester tester,
   ) async {
     tester.view.physicalSize = const Size(1920, 1080);
@@ -189,15 +189,17 @@ void main() {
     expect(find.text('GENERATE A DESIGN TO BEGIN'), findsOneWidget);
     expect(find.byTooltip('Adjust Opacity'), findsOneWidget);
 
-    // The template view shows Tesla's UV atlas. The hint would cover the
-    // artwork and the opacity slider would do nothing there.
-    await tester.tap(find.widgetWithText(ChoiceChip, 'TEMPLATE'));
-    await tester.pumpAndSettle();
-    expect(find.text('GENERATE A DESIGN TO BEGIN'), findsNothing);
-    expect(find.byTooltip('Adjust Opacity'), findsNothing);
+    // Two views, not four: the UV atlas and the reference render used to have
+    // tabs of their own and only got in the way.
+    expect(find.byType(ChoiceChip), findsNWidgets(2));
+    expect(find.widgetWithText(ChoiceChip, 'DESIGN'), findsOneWidget);
+    expect(find.widgetWithText(ChoiceChip, '3D'), findsOneWidget);
+    expect(find.widgetWithText(ChoiceChip, 'TEMPLATE'), findsNothing);
+    expect(find.widgetWithText(ChoiceChip, 'VEHICLE'), findsNothing);
 
-    // The same holds for the reference render of the vehicle.
-    await tester.tap(find.widgetWithText(ChoiceChip, 'VEHICLE'));
+    // On the 3D view the hint would sit on top of the car and the opacity
+    // slider would do nothing, because the texture is baked into the model.
+    await tester.tap(find.widgetWithText(ChoiceChip, '3D'));
     await tester.pumpAndSettle();
     expect(find.text('GENERATE A DESIGN TO BEGIN'), findsNothing);
     expect(find.byTooltip('Adjust Opacity'), findsNothing);

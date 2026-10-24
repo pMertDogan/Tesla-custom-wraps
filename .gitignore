@@ -28,3 +28,6 @@ Thumbs.db
 
 # Test artifacts
 coverage/
+
+# Node tooling (npx fetches what the model pipeline needs)
+node_modules/
