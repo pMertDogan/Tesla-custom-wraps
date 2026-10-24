@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:image/image.dart' as img;
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:tesla_custom_wraps/models/tesla_model.dart';
 import 'package:tesla_custom_wraps/screens/studio_page.dart';
 import 'package:tesla_custom_wraps/services/ai_service.dart';
 import 'package:tesla_custom_wraps/services/prompt_builder.dart';
@@ -35,6 +36,7 @@ Future<void> _pumpStudio(
   WidgetTester tester,
   AppState state, {
   Size size = const Size(1920, 1080),
+  TeslaModel? vehicle,
 }) async {
   tester.view.physicalSize = size;
   tester.view.devicePixelRatio = 1;
@@ -45,7 +47,9 @@ Future<void> _pumpStudio(
     AppScope(
       state: state,
       child: MaterialApp(
-        home: StudioPage(vehicle: VehicleService.getVehicles().first),
+        home: StudioPage(
+          vehicle: vehicle ?? VehicleService.getVehicles().first,
+        ),
       ),
     ),
   );
@@ -223,6 +227,25 @@ void main() {
         'The 3D preview runs in the browser build. This platform shows the '
         'vehicle reference render.',
       ),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('a vehicle without a model offers no 3D tab', (tester) async {
+    final state = AppState(aiService: AiService());
+    await state.load();
+
+    final modelS = VehicleService.getVehicles()
+        .firstWhere((vehicle) => vehicle.glbPath == null);
+
+    await _pumpStudio(tester, state, vehicle: modelS);
+
+    // Two tabs become one: a 3D tab that could only show a photograph would
+    // promise something the app cannot deliver.
+    expect(find.widgetWithText(ChoiceChip, 'DESIGN'), findsOneWidget);
+    expect(find.widgetWithText(ChoiceChip, '3D'), findsNothing);
+    expect(
+      find.text('No 3D model for the ${modelS.name}'),
       findsOneWidget,
     );
   });

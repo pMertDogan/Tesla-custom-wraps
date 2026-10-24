@@ -24,7 +24,7 @@ templates.
 5. **Edit** — text, logo and freehand brush layers on top of the generated
    artwork, with undo/redo, visibility and opacity per layer.
 6. **Preview in 3D** — the vehicle model with the wrap on its body, rotatable
-   and zoomable.
+   and zoomable. Two tabs only: the design and the car.
 7. **Export** — a PNG that satisfies every requirement of Tesla's Paint Shop,
    layer stack included.
 
@@ -95,25 +95,40 @@ the exported file always show the same wrap.
 
 ## 3D preview
 
-The **3D** tab shows the vehicle model with the current design on its body.
+The **3D** tab shows the vehicle model with the current design on its body. The
+studio has two tabs, not four: the UV template and the reference render used to
+have their own, but the template is an implementation detail of the export and
+the render adds nothing next to the car.
 
-- The models live in `web/models/` and are 6.3 MB together, down from 117 MB:
+- The models live in `web/models/` and are 8.3 MB together, down from 117 MB:
   Draco geometry, WebP textures, a 0.5 simplify ratio and quantised attributes.
   `tool/compress_models.sh` rebuilds them from `assets/models/`.
 - The preview runs in the browser build only. It uses the
   `<model-viewer>` element, which is downloaded when the 3D tab is opened
   together with its Draco decoder (`web/vendor/`), so neither the home page nor
   the 2D studio pays for it.
-- The wrap is written into the model's paint material at run time
-  (`GlbMaterialOverride`): a texture is appended to the GLB, and every material
-  whose name marks car paint (`carpaint`, `Carro_Pintura`, `Bodyl`, …) points at
-  it. Glass, tyres, lights and chrome keep their own materials.
-- Tesla's UV atlas and the models' own UV sets are unrelated, so the texture is
-  a tiled preview of the design rather than an exact panel placement. The
-  exported PNG remains the authoritative atlas, and the studio says as much in
-  the tab.
-- 9 of the 12 vehicles have a model; Model S, Model X and the Cybertruck
-  variants without one show the reference render.
+- **The design goes where the car is, not where the author's UVs happened to
+  point.** The models are Sketchfab downloads whose UV sets were made for their
+  own textures; painting the wrap through them smeared the design and left
+  holes. `tool/bake_wrap_uvs.py` therefore writes a second coordinate set
+  (`TEXCOORD_1`) into the painted geometry: along the car and up its side for
+  the flanks, along the car for bonnet, roof and boot, across the car for nose
+  and tail. `tool/compress_models.sh` runs it before compressing, and
+  `--prune-attributes false` keeps the attribute through optimisation.
+- At run time `GlbMaterialOverride` appends the texture to the GLB and points
+  the paint material at it through that coordinate set. Glass, tyres, lights
+  and chrome keep their own materials and their own UVs.
+- The texture is the exported atlas with its transparent gaps closed by growing
+  every panel colour outwards (`WrapTexture`), so no holes appear on the body
+  and the design stays where the artist put it.
+- Model coverage: 9 of the 12 vehicles. The Model S and Model X entries have no
+  model in this repository, so the studio offers no 3D tab for them and says so
+  instead of showing a photograph under a 3D label.
+- What is exact and what is not: the exported PNG carries Tesla's panel mask, so
+  the wrap on the car is pixel accurate. The 3D preview is a projection, not
+  the atlas, so it shows the design in the right orientation and scale but not
+  per-panel accuracy. Matching Tesla's atlas exactly needs hand-authored UVs per
+  vehicle.
 
 ## AI providers
 
@@ -492,7 +507,7 @@ spending credits.
 | Content | Size |
 | --- | --- |
 | Flutter engine, CanvasKit | about 2 MB compressed |
-| 3D models (5 files, fetched on demand) | 6.3 MB |
+| 3D models (5 files, fetched on demand) | 8.3 MB |
 | model-viewer + Draco decoder (on demand) | 1.8 MB |
 | Tesla templates (12 vehicles) | 1.5 MB |
 | Tesla reference renders and hero art | 4 MB |
@@ -522,6 +537,7 @@ lib/
   services/
     ai_service.dart             real provider calls
     glb_texture_patch.dart      writes a wrap texture into a GLB
+    wrap_texture.dart           atlas to preview texture, gaps filled
     image_source.dart           platform image picker (web + stub)
     layer_store.dart            layer persistence
     vehicle_viewer.dart         3D scene loading and the viewer widget
@@ -550,14 +566,25 @@ flutter test
 
 The suite covers the prompt contract, the exporter (naming, size budget,
 masking), the panel mask against the real Tesla templates, the provider
-catalog on disk and the AI service against a mocked HTTP client.
+catalog on disk, the AI service against a mocked HTTP client, the layer editor,
+and the 3D path: every shipped model is checked for a paintable material and for
+the baked wrap coordinates, and the preview texture is checked for filled gaps
+and preserved proportions.
+
+## Tooling
+
+| Script | What it does |
+| --- | --- |
+| `tool/compress_models.sh` | bakes the wrap coordinates, then compresses `assets/models/` into `web/models/` |
+| `tool/bake_wrap_uvs.py` | writes `TEXCOORD_1` into the painted geometry (standard library only) |
+| `tool/render_uv_check.py` | software render of a model's paint through a texture, for checking UVs without a browser (needs NumPy) |
 
 ## Roadmap
 
 - Material controls (metallic, roughness, gloss) on the 3D preview.
-- Exact 3D placement: mapping Tesla's UV atlas onto the models needs a
-  per-vehicle UV remap, since their own UV sets are unrelated to the atlas.
-- 3D models for the vehicles Tesla publishes a template for but no model.
+- Exact 3D placement: the projection follows the car's shape, not Tesla's panel
+  boundaries. Pixel-accurate previews need hand-authored UVs per vehicle.
+- 3D models for the Model S and Model X, the two vehicles without one.
 
 ## License
 

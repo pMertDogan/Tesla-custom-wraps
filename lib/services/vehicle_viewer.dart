@@ -1,17 +1,17 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
-import 'package:image/image.dart' as img;
 
 import '../models/tesla_model.dart';
 import 'glb_texture_patch.dart';
+import 'wrap_texture.dart';
 import 'model_viewer_stub.dart'
     if (dart.library.js_interop) 'model_viewer_web.dart';
 
 /// Builds the URL the 3D view loads the vehicle model from.
 ///
 /// The compressed models live in `web/models/` rather than in the asset
-/// bundle: the originals are 117 MB, the compressed set is 6 MB, and only the
+/// bundle: the originals are 117 MB, the compressed set is 8 MB, and only the
 /// browser build has a viewer. Every platform reaches them through the same
 /// relative URL.
 String? vehicleModelUrl(TeslaModel model) {
@@ -49,7 +49,7 @@ Future<Uint8List?> loadVehicleScene(
 
     if (design == null) return response.bodyBytes;
 
-    final texture = encodeViewerTexture(design);
+    final texture = WrapTexture.build(design);
     return GlbMaterialOverride.applyWrapTexture(
       response.bodyBytes,
       texture: texture,
@@ -59,56 +59,6 @@ Future<Uint8List?> loadVehicleScene(
     debugPrint('3D vehicle could not be prepared: $error');
     return null;
   }
-}
-
-/// Encodes [artwork] as the square PNG the model's body paint receives.
-///
-/// The exported wrap is a UV atlas with transparent gaps, which would show up
-/// as holes on the model. The preview therefore uses a centre crop of the
-/// artwork scaled to a square texture: it repeats over the body and reads as
-/// the wrap, while the exported file stays the authoritative atlas.
-Uint8List encodeViewerTexture(Uint8List artwork, {int size = 512}) {
-  final decoded = img.decodeImage(artwork);
-  if (decoded == null) {
-    // Not an image we understand: hand back the bytes unchanged so the model
-    // still gets a texture instead of failing outright.
-    return artwork;
-  }
-
-  final side = decoded.width < decoded.height ? decoded.width : decoded.height;
-  final square = img.copyCrop(
-    decoded,
-    x: (decoded.width - side) ~/ 2,
-    y: (decoded.height - side) ~/ 2,
-    width: side,
-    height: side,
-  );
-
-  final resized = img.copyResize(
-    square,
-    width: size,
-    height: size,
-    interpolation: img.Interpolation.average,
-  );
-
-  // Panel gaps are transparent in the atlas; on the model they belong to the
-  // body, so the preview paints them instead of leaving holes.
-  final opaque = resized.convert(numChannels: 4);
-  final rgba = opaque.getBytes(order: img.ChannelOrder.rgba);
-  for (var i = 3; i < rgba.length; i += 4) {
-    rgba[i] = 255;
-  }
-
-  return img.encodePng(
-    img.Image.fromBytes(
-      width: opaque.width,
-      height: opaque.height,
-      bytes: rgba.buffer,
-      bytesOffset: rgba.offsetInBytes,
-      numChannels: 4,
-    ),
-    level: 6,
-  );
 }
 
 /// Renders a vehicle in 3D, or explains why this build cannot.

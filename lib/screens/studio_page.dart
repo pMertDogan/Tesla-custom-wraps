@@ -23,15 +23,15 @@ import '../widgets/layer_canvas.dart';
 import '../widgets/settings_dialog.dart';
 
 /// What the preview area is showing.
+///
+/// Two views, because there are two things worth looking at: the wrap as it
+/// will be exported, and the wrap on the car. The UV template and the
+/// reference render used to have tabs of their own, but the template is an
+/// implementation detail of the export and the render adds nothing next to the
+/// 3D car.
 enum PreviewMode {
   /// The generated texture, exactly as it will be exported.
   design,
-
-  /// Tesla's UV template for the vehicle.
-  template,
-
-  /// The reference render of the vehicle.
-  vehicle,
 
   /// The vehicle model with the design on its body.
   model3d,
@@ -1300,16 +1300,6 @@ class _StudioPageState extends State<StudioPage> {
           width: displayWidth,
           fit: BoxFit.contain,
         ),
-      PreviewMode.template => Image.asset(
-          widget.vehicle.templatePath,
-          width: displayWidth,
-          fit: BoxFit.contain,
-        ),
-      PreviewMode.vehicle => Image.asset(
-          widget.vehicle.imagePath,
-          width: displayWidth,
-          fit: BoxFit.contain,
-        ),
       PreviewMode.model3d => _build3dPreview(design),
     };
 
@@ -1379,12 +1369,14 @@ class _StudioPageState extends State<StudioPage> {
   }
 
   Widget _buildModeSwitcher() {
+    // Models exist for most, but not all, vehicles. A 3D tab that can only
+    // show a photograph would be a promise the app cannot keep, so it is
+    // offered only when there is a model to load.
+    final hasModel = vehicleModelUrl(widget.vehicle) != null;
+
     return Container(
       height: 48,
       color: Colors.white.withAlpha(5),
-      // Four chips do not fit a 420 pixel phone: scroll them rather than
-      // clipping the last one. The row still shrinks to its content, so it
-      // stays centred on a wide window.
       child: Center(
         child: SingleChildScrollView(
           scrollDirection: Axis.horizontal,
@@ -1392,9 +1384,18 @@ class _StudioPageState extends State<StudioPage> {
             mainAxisSize: MainAxisSize.min,
             children: [
               _modeChip('DESIGN', PreviewMode.design),
-              _modeChip('TEMPLATE', PreviewMode.template),
-              _modeChip('VEHICLE', PreviewMode.vehicle),
-              _modeChip('3D', PreviewMode.model3d),
+              if (hasModel) _modeChip('3D', PreviewMode.model3d),
+              if (!hasModel)
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  child: Text(
+                    'No 3D model for the ${widget.vehicle.name}',
+                    style: const TextStyle(
+                      color: Colors.white38,
+                      fontSize: 11,
+                    ),
+                  ),
+                ),
             ],
           ),
         ),

@@ -12,8 +12,8 @@ import 'dart:typed_data';
 /// 2. a buffer view, an image, a sampler and a texture are added to the JSON
 ///    chunk, all pointing at those new bytes,
 /// 3. every material whose name marks it as car paint gets a
-///    `baseColorTexture` pointing at the new texture, tiled by the tiling
-///    factors the wrap needs.
+///    `baseColorTexture` pointing at the new texture, sampled through the wrap
+///    coordinate set the models are baked with (`TEXCOORD_1`).
 ///
 /// The result is a valid GLB that `model-viewer` loads like any other. Nothing
 /// outside the body paint changes: glass, tyres, lights and chrome keep their
@@ -94,11 +94,69 @@ class GlbMaterialOverride {
     return false;
   }
 
+  /// The vertex attribute the wrap is sampled through.
+  ///
+  /// `tool/bake_wrap_uvs.py` writes a projection that runs along the car and
+  /// up its side into `TEXCOORD_1`, leaving the author's own UV set alone.
+  /// Painting through `TEXCOORD_0` is what used to smear the design.
+  static const String wrapUvSet = 'TEXCOORD_1';
+
+  /// Whether any primitive carries the baked wrap coordinates.
+  ///
+  /// Models built before `tool/bake_wrap_uvs.py` existed only have the
+  /// author's UV set; those still get a preview, just a less accurate one, so
+  /// the viewer falls back to `TEXCOORD_0` instead of sampling an attribute
+  /// the mesh does not have.
+  static bool usesWrapCoordinates(Map<String, dynamic> json) {
+    final meshes = json['meshes'];
+    if (meshes is! List) return false;
+
+    for (final mesh in meshes) {
+      if (mesh is! Map) continue;
+      final primitives = mesh['primitives'];
+      if (primitives is! List) continue;
+      for (final primitive in primitives) {
+        if (primitive is! Map) continue;
+        final attributes = primitive['attributes'];
+        if (attributes is Map && attributes.containsKey(wrapUvSet)) return true;
+      }
+    }
+    return false;
+  }
+
+  /// The materials whose geometry carries [wrapUvSet] on every primitive.
+  ///
+  /// A material is only safe to sample through the wrap coordinates when all
+  /// of its primitives have them: a primitive without the attribute would
+  /// sample zero and render black.
+  static Set<int> materialsWithWrapCoordinates(Map<String, dynamic> json) {
+    final meshes = json['meshes'];
+    if (meshes is! List) return const {};
+
+    final withWrap = <int>{};
+    final withoutWrap = <int>{};
+    for (final mesh in meshes) {
+      if (mesh is! Map) continue;
+      final primitives = mesh['primitives'];
+      if (primitives is! List) continue;
+      for (final primitive in primitives) {
+        if (primitive is! Map) continue;
+        final material = primitive['material'];
+        if (material is! int) continue;
+        final attributes = primitive['attributes'];
+        if (attributes is Map && attributes.containsKey(wrapUvSet)) {
+          withWrap.add(material);
+        } else {
+          withoutWrap.add(material);
+        }
+      }
+    }
+    return withWrap.difference(withoutWrap);
+  }
+
   /// Merges a base colour texture into [glb].
   ///
-  /// [texture] is the encoded image (WebP or PNG). [uvScale] repeats the wrap
-  /// across the body panels: the model's UV set is not Tesla's atlas, so the
-  /// preview shows the wrap pattern rather than an exact panel placement.
+  /// [texture] is the encoded image (PNG or WebP) of the wrap.
   ///
   /// Returns `null` when [glb] is not a GLB that can be rewritten. A caller
   /// that gets `null` should show the model without a wrap instead of failing.
@@ -106,7 +164,6 @@ class GlbMaterialOverride {
     Uint8List glb, {
     required Uint8List texture,
     required String mimeType,
-    double uvScale = 1,
   }) {
     final parsed = _Glb.parse(glb);
     if (parsed == null) return null;
@@ -152,8 +209,10 @@ class GlbMaterialOverride {
     });
 
     final indices = paintMaterialIndices(json);
+    final wrapped = materialsWithWrapCoordinates(json);
     var painted = 0;
     for (final index in indices) {
+      final texCoord = wrapped.contains(index) ? 1 : 0;
       if (index < 0 || index >= materials.length) continue;
       final material = materials[index];
 
@@ -165,36 +224,12 @@ class GlbMaterialOverride {
 
       pbr['baseColorTexture'] = {
         'index': textureIndex,
-        'texCoord': 0,
+        'texCoord': texCoord,
       };
       // A metal panel would darken the pattern and a glossy one would turn it
       // into a mirror; the preview wants the artwork itself.
       pbr['metallicFactor'] = 0.05;
       pbr['roughnessFactor'] = 0.55;
-      if (uvScale != 1) {
-        // Metallic-roughness textures and the base colour share the transform
-        // only when it lives on the texture info, which older viewers ignore
-        // for base colour. The scale is applied through KHR_texture_transform
-        // when the caller needs it.
-        pbr['baseColorTexture'] = {
-          'index': textureIndex,
-          'texCoord': 0,
-          'extensions': {
-            'KHR_texture_transform': {
-              'scale': [uvScale, uvScale],
-              'offset': [0, 0],
-            },
-          },
-        };
-        final extensionsUsed = json['extensionsUsed'];
-        if (extensionsUsed is List) {
-          if (!extensionsUsed.contains('KHR_texture_transform')) {
-            extensionsUsed.add('KHR_texture_transform');
-          }
-        } else {
-          json['extensionsUsed'] = ['KHR_texture_transform'];
-        }
-      }
       painted++;
     }
 
